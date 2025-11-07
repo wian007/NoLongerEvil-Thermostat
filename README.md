@@ -6,6 +6,12 @@
 
 This directory contains the tools and firmware needed to flash custom firmware to Nest Thermostat devices using the OMAP DFU (Device Firmware Update) interface.
 
+## Prerequesites
+
+You will need to have, ideally, a linux computer available. MacOS can also be used but some people are having difficulties. Windows should be able to be used with MingW or CygWin but YMMV.
+
+⚠️ This firmware is only for Nest Generation 1 and 2. On the back plate you should see a bubble level, which should be green. If it's blue, that's gen 3 and not supported yet.
+
 ## Overview
 
 This firmware loader uses the OMAP bootloader interface to flash custom bootloader and kernel images to Nest Thermostat devices. The device must be put into DFU mode to accept new firmware.
