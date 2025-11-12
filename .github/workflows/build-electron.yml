@@ -1,0 +1,68 @@
+name: Build Electron App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: firmware/installer/package-lock.json
+
+      - name: Install dependencies
+        working-directory: firmware/installer
+        run: npm ci
+
+      - name: Build Vite app
+        working-directory: firmware/installer
+        run: npm run build
+
+      - name: Prepare for app notarization
+        if: startsWith(matrix.os, 'macos')
+        # Import Apple API key for app notarization on macOS
+        run: |
+          mkdir -p ~/private_keys/
+          echo '${{ secrets.api_key }}' > ~/private_keys/AuthKey_${{ secrets.api_key_id }}.p8
+
+      - name: Build Electron app
+        uses: samuelmeuli/action-electron-builder@v1
+        env:
+          API_KEY_ID: ${{ secrets.APPLE_ID }}
+          API_KEY_ISSUER_ID: ${{ secrets.APPLE_ID_PASSWORD }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Build the app in the firmware/installer directory
+          package_root: firmware/installer
+
+          # Build for the current platform
+          mac_certs: ${{ secrets.MAC_CERTS }}
+          mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
+
+          # Skip publish - just build
+          skip_build: false
+          args: --publish never
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: electron-app-${{ matrix.os }}
+          path: |
+            firmware/installer/dist/*.dmg
+            firmware/installer/dist/*.AppImage
+            firmware/installer/dist/*.zip
