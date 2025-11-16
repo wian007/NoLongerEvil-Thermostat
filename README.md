@@ -134,6 +134,11 @@ pm2 startup
 
 Visit `http://localhost:3000` to access the dashboard.
 
+### Step 8: Set up your instance
+
+From `http://localhost:3000`, Sign up for an account with an active email address . Clerk will email you a one-time login code.
+Follow the instructions from [https://docs.nolongerevil.com/hosted/installation#step-7:-register-account](https://docs.nolongerevil.com/hosted/installation#step-7:-register-account) onward to get an Entry Key and get your Nest active on your local server.
+
 ## What Gets Flashed
 
 The firmware installation process installs three components:
