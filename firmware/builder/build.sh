@@ -255,18 +255,37 @@ check_dependencies() {
 setup_dependencies() {
   print_section "Setting Up Build Dependencies"
 
-  if [ ! -d "deps/toolchain/arm-2008q3" ] || \
-     [ ! -d "deps/x-loader" ] || \
-     [ ! -d "deps/u-boot" ] || \
-     [ ! -d "deps/linux" ]; then
-    print_info "Downloading build dependencies (this may take a while)..."
-    echo
-    bash scripts/download-deps.sh
-  else
-    print_success "Build dependencies already present"
+  local need_download=false
+  local download_args=""
+
+  if [ ! -d "deps/toolchain/arm-2008q3" ]; then
+    need_download=true
   fi
 
-  if [ ! -f "deps/initramfs_data.cpio" ]; then
+  if [ "$BUILD_XLOADER" = true ] && [ ! -d "deps/x-loader" ]; then
+    need_download=true
+    download_args="$download_args --xloader"
+  fi
+
+  if [ "$BUILD_UBOOT" = true ] && [ ! -d "deps/u-boot" ]; then
+    need_download=true
+    download_args="$download_args --uboot"
+  fi
+
+  if [ "$NEED_CUSTOM_BUILD" = true ]; then
+    need_download=true
+    download_args="$download_args --linux"
+  fi
+
+  if [ "$need_download" = true ]; then
+    print_info "Downloading required build dependencies (this may take a while)..."
+    echo
+    bash scripts/download-deps.sh $download_args
+  else
+    print_success "All required build dependencies already present"
+  fi
+
+  if [ "$NEED_CUSTOM_BUILD" = true ] && [ ! -f "deps/initramfs_data.cpio" ]; then
     print_error "Base initramfs not found at deps/initramfs_data.cpio"
     echo "This file should be included with the builder package."
     exit 1
@@ -293,20 +312,30 @@ configure_build() {
     echo
   fi
 
-  if [ "$NON_INTERACTIVE" = false ] && [ "$BUILD_XLOADER_SET" != true ]; then
-    echo -e "${BOLD}Bootloader Options:${NC}"
-    echo "Building from source is only needed if you're modifying bootloader code."
-    echo "Pre-compiled binaries are available and recommended for most users."
-    echo
+  if [ "$BUILD_XLOADER_SET" != true ]; then
+    if [ -f "$FIRMWARE_DIR/x-load.bin" ]; then
+      BUILD_XLOADER=false
+      print_info "Found existing x-load.bin, will use it"
+    elif [ "$NON_INTERACTIVE" = false ]; then
+      echo -e "${BOLD}Bootloader Options:${NC}"
+      echo "Building from source is only needed if you're modifying bootloader code."
+      echo "Pre-compiled binaries are available and recommended for most users."
+      echo
 
-    if ask_yes_no "Build x-loader from source?" "n"; then
-      BUILD_XLOADER=true
+      if ask_yes_no "Build x-loader from source?" "n"; then
+        BUILD_XLOADER=true
+      fi
     fi
   fi
 
-  if [ "$NON_INTERACTIVE" = false ] && [ "$BUILD_UBOOT_SET" != true ]; then
-    if ask_yes_no "Build u-boot from source?" "n"; then
-      BUILD_UBOOT=true
+  if [ "$BUILD_UBOOT_SET" != true ]; then
+    if [ -f "$FIRMWARE_DIR/u-boot.bin" ]; then
+      BUILD_UBOOT=false
+      print_info "Found existing u-boot.bin, will use it"
+    elif [ "$NON_INTERACTIVE" = false ]; then
+      if ask_yes_no "Build u-boot from source?" "n"; then
+        BUILD_UBOOT=true
+      fi
     fi
   fi
 
@@ -319,9 +348,13 @@ configure_build() {
     API_URL=$(ask_input "Enter API URL" "$API_URL")
   fi
 
-  NEED_CUSTOM_BUILD=false
-  if [ "$API_URL" != "$DEFAULT_API_URL" ] || [ "$FORCE_BUILD" = true ]; then
-    NEED_CUSTOM_BUILD=true
+  if [ "$NEED_CUSTOM_BUILD" != true ]; then
+    if [ "$API_URL" != "$DEFAULT_API_URL" ]; then
+      NEED_CUSTOM_BUILD=true
+    elif [ ! -f "$FIRMWARE_DIR/uImage" ]; then
+      NEED_CUSTOM_BUILD=true
+      print_info "uImage not found, will build kernel from source"
+    fi
   fi
 
   echo
@@ -345,7 +378,7 @@ configure_build() {
 
 build_firmware() {
   print_section "Building Firmware"
-
+  
   if [ "$BUILD_XLOADER" = true ]; then
     rm -f "$SCRIPT_DIR/firmware/x-load.bin" 2>/dev/null || true
     rm -f "$SCRIPT_DIR/../installer/resources/firmware/x-load.bin" 2>/dev/null || true
@@ -383,6 +416,8 @@ build_firmware() {
   fi
 
   if [ "$NEED_CUSTOM_BUILD" = true ]; then
+    echo
+    print_section "Building Custom Kernel"
     print_info "Building custom kernel with custom initramfs..."
     echo
 
@@ -396,50 +431,30 @@ build_firmware() {
     cd "$SCRIPT_DIR"
     print_info "Configuring NoLongerEvil settings..."
 
-    # 1. Update cloudregisterurl directly in /etc/nestlabs/client.config
-    if [ -f "$SCRIPT_DIR/deps/root/etc/nestlabs/client.config" ]; then
-      ENTRY_URL="$API_URL"
-      if [[ ! "$ENTRY_URL" =~ /entry$ ]]; then
-        ENTRY_URL="${ENTRY_URL}/entry"
-      fi
-
-      sed -i.bak "s|<a key=\"cloudregisterurl\" value=\"[^\"]*\"|<a key=\"cloudregisterurl\" value=\"$ENTRY_URL\"|g" \
-        "$SCRIPT_DIR/deps/root/etc/nestlabs/client.config"
-      rm -f "$SCRIPT_DIR/deps/root/etc/nestlabs/client.config.bak"
-
-      if grep -q "cloudregisterurl.*value=\"$ENTRY_URL\"" "$SCRIPT_DIR/deps/root/etc/nestlabs/client.config"; then
-        print_success "Updated cloudregisterurl in /etc/nestlabs/client.config to: $ENTRY_URL"
-      else
-        print_warning "Failed to update cloudregisterurl"
-      fi
-    else
-      print_warning "client.config not found at /etc/nestlabs/client.config"
+    ENTRY_URL="$API_URL"
+    if [[ ! "$ENTRY_URL" =~ /entry$ ]]; then
+      ENTRY_URL="${ENTRY_URL}/entry"
     fi
 
-    # 2. Overwrite CA certificate directly to /etc/ssl/certs/ca-bundle.pem
-    if [ -f "/server/certs/ca-cert.pem" ]; then
-      cp "/server/certs/ca-cert.pem" "$SCRIPT_DIR/deps/root/etc/ssl/certs/ca-bundle.pem"
-      chmod 644 "$SCRIPT_DIR/deps/root/etc/ssl/certs/ca-bundle.pem"
-      print_success "Installed CA certificate to /etc/ssl/certs/ca-bundle.pem"
-    else
-      print_warning "CA certificate not found at /server/certs/ca-cert.pem"
-    fi
-
-    # 3. Modify /etc/init.d/rootme to copy our modified files to /tmp/1/
     ROOTME_SCRIPT="$SCRIPT_DIR/deps/root/etc/init.d/rootme"
     if [ -f "$ROOTME_SCRIPT" ]; then
-      print_info "Modifying rootme script to apply NoLongerEvil changes..."
+      print_info "Generating dynamic rootme script..."
 
-      # Generate encrypted password if root access is enabled
       if [ "$ENABLE_ROOT_ACCESS" = true ]; then
         ROOT_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | head -c 18)
-        # Generate crypt-compatible password hash (DES format for compatibility)
         ROOT_HASH=$(openssl passwd -crypt "$ROOT_PASSWORD")
         print_success "Generated root password: $ROOT_PASSWORD"
       fi
 
-      # Create new rootme script
-      cat > "$ROOTME_SCRIPT" << 'ROOTME_EOF'
+      CA_CERT_CONTENT=""
+      USE_CUSTOM_CERT=false
+      if [ "$API_URL" != "https://backdoor.nolongerevil.com" ] && [ -f "/server/certs/ca-cert.pem" ]; then
+        CA_CERT_CONTENT=$(cat /server/certs/ca-cert.pem)
+        USE_CUSTOM_CERT=true
+        print_success "Loaded custom CA certificate for embedding"
+      fi
+
+      cat > "$ROOTME_SCRIPT" << ROOTME_EOF
 #!/bin/sh
 set +e
 mkdir -p /tmp/1 || true
@@ -447,39 +462,40 @@ mount /dev/mtdblock7 /tmp/1 -tjffs2 || true
 
 ROOTME_EOF
 
-      # Add dropbear and busybox setup only if root access is enabled
       if [ "$ENABLE_ROOT_ACCESS" = true ]; then
         cat >> "$ROOTME_SCRIPT" << 'ROOTME_EOF'
-cp /bin/busybox2 /tmp/1/bin/busybox2
-cp /bin/autossh /tmp/1/bin/autossh
+cp /bin/busybox2 /tmp/1/bin/busybox2 || true
+cp /bin/autossh /tmp/1/bin/autossh || true
 chmod 777 /tmp/1/bin/busybox2
 chmod 777 /tmp/1/bin/autossh
 
-#cp /bin/sshconnect /tmp/1/bin/sshconnect
-#chmod +x /tmp/1/bin/sshconnect
-
 cp /bin/dropbearmulti /tmp/1/bin/dropbearmulti
-ln -s /bin/dropbearmulti /tmp/1/bin/dropbear
-ln -s /bin/dropbearmulti /tmp/1/bin/dropbearkey
-ln -s /bin/dropbearmulti /tmp/1/bin/ssh
-ln -s /bin/dropbearmulti /tmp/1/bin/dropbearconvert
+ln -sf /bin/dropbearmulti /tmp/1/bin/dropbear
+ln -sf /bin/dropbearmulti /tmp/1/bin/dropbearkey
+ln -sf /bin/dropbearmulti /tmp/1/bin/ssh
+ln -sf /bin/dropbearmulti /tmp/1/bin/dropbearconvert
 
-chmod +x /tmp/1/bin/dropbearmulti
-chmod +x /tmp/1/bin/dropbear
-chmod +x /tmp/1/bin/dropbearkey
-chmod +x /tmp/1/bin/ssh
-chmod +x /tmp/1/bin/dropbearconvert
+chmod +x /tmp/1/bin/dropbearmulti || true
+chmod +x /tmp/1/bin/dropbear || true
+chmod +x /tmp/1/bin/dropbearkey || true
+chmod +x /tmp/1/bin/ssh || true
+chmod +x /tmp/1/bin/dropbearconvert || true
 
-mkdir /tmp/1/etc/dropbear
+mkdir -p /tmp/1/etc/dropbear || true
 /tmp/1/bin/dropbearkey -t dss -f /tmp/1/etc/dropbear/dropbear_dss_host_key
 /tmp/1/bin/dropbearkey -t rsa -s 2048 -f /tmp/1/etc/dropbear/dropbear_rsa_host_key
 /tmp/1/bin/dropbearkey -t ecdsa -s 521 -f /tmp/1/etc/dropbear/dropbear_ecdsa_host_key
 
 cat /tmp/1/etc/shadow | grep -v root > /tmp/1/etc/shadow.tmp
 mv /tmp/1/etc/shadow.tmp /tmp/1/etc/shadow
+ROOTME_EOF
+
+        cat >> "$ROOTME_SCRIPT" << ROOTME_EOF
 echo "root:${ROOT_HASH}:16243:0:99999:7:::" >> /tmp/1/etc/shadow
 
-# Add dropbear to rcS if not already present
+ROOTME_EOF
+
+        cat >> "$ROOTME_SCRIPT" << 'ROOTME_EOF'
 if ! grep -q "/bin/dropbear" /tmp/1/etc/init.d/rcS; then
   echo "/bin/dropbear" >> /tmp/1/etc/init.d/rcS
 fi
@@ -487,19 +503,37 @@ fi
 ROOTME_EOF
       fi
 
-      # Add NoLongerEvil file copy commands before umount
-      cat >> "$ROOTME_SCRIPT" << 'ROOTME_EOF'
-# NoLongerEvil: Copy modified configuration files to persistent storage
-cp /etc/nestlabs/client.config /tmp/1/etc/nestlabs/client.config 2>/dev/null || true
-cp /etc/ssl/certs/ca-bundle.pem /tmp/1/etc/ssl/certs/ca-bundle.pem 2>/dev/null || true
+      cat >> "$ROOTME_SCRIPT" << ROOTME_EOF
+sed -i 's|<a key="cloudregisterurl" value="[^"]*"|<a key="cloudregisterurl" value="$ENTRY_URL"|g' /tmp/1/etc/nestlabs/client.config
+sed -i '/15.204.110.215/d' /tmp/1/etc/hosts
+sed -i '/\/bin\/nolongerevil/d' /tmp/1/etc/init.d/rcS
 
+ROOTME_EOF
+
+      if [ "$USE_CUSTOM_CERT" = true ]; then
+        cat >> "$ROOTME_SCRIPT" << 'ROOTME_EOF'
+cat > /tmp/1/etc/ssl/certs/ca-bundle.pem << 'CA_CERT_EOF'
+ROOTME_EOF
+
+        cat >> "$ROOTME_SCRIPT" << ROOTME_EOF
+$CA_CERT_CONTENT
+ROOTME_EOF
+
+        cat >> "$ROOTME_SCRIPT" << 'ROOTME_EOF'
+CA_CERT_EOF
+chmod 644 /tmp/1/etc/ssl/certs/ca-bundle.pem || true
+
+ROOTME_EOF
+      fi
+
+      cat >> "$ROOTME_SCRIPT" << 'ROOTME_EOF'
 umount /tmp/1 2>/dev/null || true
 reboot
 ROOTME_EOF
 
       chmod 777 "$ROOTME_SCRIPT"
       chmod +x "$ROOTME_SCRIPT"
-      print_success "Modified rootme script with NoLongerEvil changes"
+      print_success "Generated dynamic rootme script with API URL: $ENTRY_URL"
     else
       print_warning "rootme script not found at /etc/init.d/rootme"
     fi
@@ -665,8 +699,8 @@ main() {
   parse_args "$@"
   print_header
   check_dependencies
-  setup_dependencies
   configure_build
+  setup_dependencies
   build_firmware
   print_results
 }

@@ -167,6 +167,8 @@ generate_certs() {
 build_firmware() {
   local api_url="$1"
   local generation="$2"
+  local enable_root="$3"
+  local enable_backplate="$4"
   echo ""
   echo "Preparing firmware build for ${api_url}..."
 
@@ -178,8 +180,16 @@ build_firmware() {
   echo "[→] Building firmware in Docker..."
   echo ""
 
+  local build_args="--api-url $api_url --generation $generation"
+  if [ "$enable_root" = true ]; then
+    build_args="$build_args --enable-root-access"
+  fi
+  if [ "$enable_backplate" = true ]; then
+    build_args="$build_args --enable-backplate-sim"
+  fi
+
   local build_log="$ROOT_DIR/firmware_build.log"
-  (cd "$BUILDER_DIR" && bash docker-build.sh --yes --force-build --build-xloader --build-uboot --api-url "$api_url" --generation "$generation") | tee "$build_log"
+  (cd "$BUILDER_DIR" && bash docker-build.sh $build_args) | tee "$build_log"
 
   FIRMWARE_ROOT_PASSWORD=$(grep "Password:" "$build_log" | grep -oE "[A-Za-z0-9]{18}" | tail -1)
 
@@ -190,32 +200,66 @@ build_firmware() {
 
   if [ -f "$BUILDER_DIR/firmware/x-load.bin" ]; then
     cp "$BUILDER_DIR/firmware/x-load.bin" "$installer_firmware/"
-    echo "[✓] Copied x-load.bin to installer/resources/firmware"
   fi
 
   if [ -f "$BUILDER_DIR/firmware/u-boot.bin" ]; then
     cp "$BUILDER_DIR/firmware/u-boot.bin" "$installer_firmware/"
-    echo "[✓] Copied u-boot.bin to installer/resources/firmware"
   fi
 
   if [ -f "$BUILDER_DIR/firmware/uImage" ]; then
     cp "$BUILDER_DIR/firmware/uImage" "$installer_firmware/"
-    echo "[✓] Copied uImage to installer/resources/firmware"
   fi
 
   echo ""
-  echo "[→] Building OMAP installer..."
-  local installer_dir="$ROOT_DIR/firmware/installer"
-  if [ -f "$installer_dir/build.sh" ]; then
-    (cd "$installer_dir" && bash build.sh)
-    echo "[✓] OMAP installer built successfully"
-  else
-    echo "[!] Warning: installer/build.sh not found, skipping OMAP build"
+  local installer_firmware="$ROOT_DIR/firmware/installer/resources/firmware"
+
+  if [ ! -f "$installer_firmware/x-load.bin" ] || [ ! -f "$installer_firmware/u-boot.bin" ] || [ ! -f "$installer_firmware/uImage" ]; then
+    echo "[!] Error: Firmware files failed to build"
+    echo "    Missing files in firmware/installer/resources/firmware/"
+    exit 1
   fi
 
-  echo "[→] Cleaning up build artifacts..."
-  (cd "$installer_dir/src/omap_loader" && make clean >/dev/null 2>&1)
-  echo "[✓] Build cleanup complete"
+  echo "[✓] All firmware files verified"
+
+  echo ""
+  local installer_dir="$ROOT_DIR/firmware/installer"
+
+  if [ ! -d "$installer_dir" ]; then
+    echo "[!] Error: Installer directory not found"
+    exit 1
+  fi
+
+  cd "$installer_dir"
+
+  if [ ! -d "node_modules" ]; then
+    echo "[→] Installing Firmware installer dependencies..."
+    npm install
+  fi
+
+  echo "[✓] Starting Firmware installer GUI..."
+  npm run electron:dev
+}
+
+launch_installer() {
+  local installer_dir="$ROOT_DIR/firmware/installer"
+
+  if [ ! -d "$installer_dir" ]; then
+    echo "[!] Error: Installer directory not found"
+    return 1
+  fi
+
+  echo ""
+  echo "[→] Launching Firmware installer..."
+
+  cd "$installer_dir"
+
+  if [ ! -d "node_modules" ]; then
+    echo "[→] Installing Firmware installer dependencies..."
+    npm install
+  fi
+
+  echo "[✓] Starting Firmware installer GUI..."
+  npm run electron:dev
 }
 
 echo "============================================="
@@ -296,6 +340,30 @@ echo "Environment updated (server/.env & .env.example)."
 
 generate_certs "$api_host"
 
+echo ""
+echo "Advanced Firmware Options"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "⚠️  WARNING: The following options are advanced features."
+echo "   Only enable them if you know what they do."
+echo ""
+
+ENABLE_ROOT_ACCESS=false
+if prompt_yes_no "Enable SSH root access on the thermostat?" "n"; then
+  ENABLE_ROOT_ACCESS=true
+  echo "Root access will be enabled (SSH on port 22)"
+else
+  echo "Root access disabled"
+fi
+
+ENABLE_BACKPLATE_SIM=false
+if prompt_yes_no "Enable backplate simulation?" "n"; then
+  ENABLE_BACKPLATE_SIM=true
+  echo "Backplate simulation will be enabled"
+else
+  echo "Backplate simulation disabled"
+fi
+
 nest_generation="gen2"
 
 if [ -f "firmware/installer/resources/firmware/x-load.bin" ] && [ -f "firmware/installer/resources/firmware/u-boot.bin" ] && [ -f "firmware/installer/resources/firmware/uImage" ]; then
@@ -309,7 +377,7 @@ if [ -f "firmware/installer/resources/firmware/x-load.bin" ] && [ -f "firmware/i
       echo "Skipping firmware build. You can build later with:"
       echo "  cd firmware/builder && ./docker-build.sh --api-url $api_origin --generation $nest_generation --force-build"
     else
-      build_firmware "$api_origin" "$nest_generation"
+      build_firmware "$api_origin" "$nest_generation" "$ENABLE_ROOT_ACCESS" "$ENABLE_BACKPLATE_SIM"
     fi
   else
     echo "Using existing firmware files."
@@ -325,7 +393,7 @@ else
   else
     echo ""
     echo "Firmware files not found. Building firmware..."
-    build_firmware "$api_origin" "$nest_generation"
+    build_firmware "$api_origin" "$nest_generation" "$ENABLE_ROOT_ACCESS" "$ENABLE_BACKPLATE_SIM"
   fi
 fi
 
@@ -343,7 +411,7 @@ if [ -f "firmware/installer/resources/firmware/x-load.bin" ] && [ -f "firmware/i
   echo ""
 fi
 
-if [ -n "$FIRMWARE_ROOT_PASSWORD" ]; then
+if [ -n "${FIRMWARE_ROOT_PASSWORD:-}" ]; then
   echo "Root Access Enabled:"
   echo "  Username: root"
   echo "  Password: $FIRMWARE_ROOT_PASSWORD"
@@ -359,38 +427,27 @@ echo "  - nest_server.key (server private key)"
 echo "  - ca-cert.pem (CA certificate for firmware)"
 echo ""
 
-if [ -f "firmware/installer/install.sh" ]; then
-  echo "============================================="
-  echo "  Ready to Flash Firmware"
-  echo "============================================="
-  echo ""
-  echo "Put your Nest thermostat into DFU mode:"
-  echo "  1. Remove the Nest from the wall"
-  echo "  2. Hold down the display while plugging in USB"
-  echo "  3. Keep holding for ~10 seconds until display goes blank"
-  echo "  4. Release - the Nest is now in DFU mode"
-  echo ""
-
-  if prompt_yes_no "Flash firmware now?" "y"; then
-    echo ""
-    (cd firmware/installer && bash install.sh)
-  else
-    echo ""
-    echo "You can flash later with:"
-    echo "  cd firmware/installer && bash install.sh"
-  fi
+if [ -f "firmware/installer/resources/firmware/x-load.bin" ] && [ -f "firmware/installer/resources/firmware/u-boot.bin" ] && [ -f "firmware/installer/resources/firmware/uImage" ]; then
+  launch_installer
 fi
 
 echo ""
 echo "============================================="
 echo "  Next Steps"
 echo "============================================="
+echo ""
+echo "The Electron installer GUI should have launched."
+echo "If not, you can start it manually with:"
+echo "  cd firmware/installer && npm run electron:dev"
+echo ""
 
 if [ "$api_origin" = "https://backdoor.nolongerevil.com" ]; then
+  echo "After flashing firmware:"
   echo "1. Go to https://nolongerevil.com"
   echo "2. Enter your entry code when prompted"
   echo "3. Your Nest will connect to the NoLongerEvil service"
 else
+  echo "After flashing firmware:"
   echo "1. Start your self-hosted server:"
   echo "   cd server && npm install && npm run start"
   echo "2. Your Nest will connect to: $api_origin"

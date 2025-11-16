@@ -90,6 +90,7 @@ tmp/
 temp/
 *.tmp
 .cache/
+firmware_build.log
 
 # Electron build artifacts
 out/

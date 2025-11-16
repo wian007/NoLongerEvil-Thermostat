@@ -15,10 +15,17 @@ $DOCKER_CMD build --no-cache -t nest-firmware-builder .
 USER_ID=$(id -u)
 GROUP_ID=$(id -g)
 
-DOCKER_FLAGS="--rm"
-if [[ " $* " =~ " --debug-pause " ]]; then
-    echo "[→] Debug mode enabled - running in interactive mode"
-    DOCKER_FLAGS="-it --rm"
+DOCKER_FLAGS="-it --rm"
+if [[ " $* " =~ " --non-interactive " ]] || [[ " $* " =~ " --yes " ]] || [[ " $* " =~ " -y " ]]; then
+    # Only disable interactive mode if explicitly requested
+    if [[ ! " $* " =~ " --debug-pause " ]]; then
+        DOCKER_FLAGS="--rm"
+        echo "[→] Running in non-interactive mode"
+    else
+        echo "[→] Debug mode enabled - running in interactive mode despite --yes flag"
+    fi
+else
+    echo "[→] Running in interactive mode"
 fi
 
 echo ""
