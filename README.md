@@ -82,8 +82,8 @@ Both Convex and the NoLongerEvil application expect environment vars at `.env.lo
 **Server** (`server/.env.local`):
 
 ```bash
-CONVEX_URL=http://localhost:3210
-CONVEX_ADMIN_KEY=<admin-key-from-step-4>
+CONVEX_SELF_HOSTED_URL=http://localhost:3210
+CONVEX_SELF_HOSTED_ADMIN_KEY=<admin-key-from-step-4>
 ```
 
 ### Step 6: Deploy Convex Schema
@@ -167,13 +167,13 @@ This project builds upon the excellent work of several security researchers and 
 
 Without their groundbreaking research, open-source contributions, and advocacy for device ownership rights, this work would not be possible. Thank you!
 
-### Open Source Commitment
+## Open Source Commitment
 
 We are committed to transparency and the right-to-repair movement. This project is now fully open source, allowing the community to audit, improve, and self-host their own infrastructure.
 
 ## Support
 
-This project is sponsored by and made by the team at:
+This project is sponsored by the team at:
 
 <p align="center">
   <a href="https://hackhouse.io" target="_blank">
@@ -189,4 +189,4 @@ This project is sponsored by and made by the team at:
 
 ## License
 
-No Longer Evil is [MIT licensed](LICENSE).
+No Longer Evil is MIT licensed.
