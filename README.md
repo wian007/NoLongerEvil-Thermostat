@@ -51,6 +51,7 @@ chmod +x install.sh
 ```
 
 This will:
+
 - Prompt you for your API server URL
 - Build the firmware with Docker
 - Launch the Electron installer app
@@ -67,32 +68,40 @@ docker compose exec backend ./generate_admin_key.sh
 ```
 
 Save the admin key that is generated.
+It will look like:
+
+```
+Admin key:
+convex-self-hosted|01949bdf5627839049029834...
+```
 
 ### Step 5: Configure Environment Variables
 
-**Server** (`server/.env`):
+Both Convex and the NoLongerEvil application expect environment vars at `.env.local` instead of the traditional `.env`
+
+**Server** (`server/.env.local`):
+
 ```bash
 CONVEX_URL=http://localhost:3210
 CONVEX_ADMIN_KEY=<admin-key-from-step-4>
 ```
 
-**Frontend** (`frontend/.env.local`):
-```bash
-CONVEX_SELF_HOSTED_URL=http://localhost:3210
-CONVEX_SELF_HOSTED_ADMIN_KEY=<admin-key-from-step-4>
-```
-
 ### Step 6: Deploy Convex Schema
 
+This takes the "table" schema of the app and deploys it into Convex.
+
 ```bash
-cd frontend
+cd server
 npm install
 npx convex dev
 ```
 
+When this step is done you can Ctrl+C to end the terminal
+
 ### Step 7: Run Backend and Frontend
 
 **Development:**
+Run these in two separate terminals
 
 ```bash
 # Terminal 1 - API Server

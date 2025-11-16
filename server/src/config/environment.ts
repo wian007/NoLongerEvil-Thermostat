@@ -4,8 +4,10 @@
  */
 
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 import type { EnvironmentConfig } from '../lib/types';
 
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config();
 
 /**
