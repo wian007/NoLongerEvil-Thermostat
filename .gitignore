@@ -63,16 +63,6 @@ certificates/
 **/certs/**
 **/certificates/**
 
-# Entitlements and signing configs
-*.entitlements
-*.plist
-!Info.plist
-forge.config.js
-sign*.js
-notarize*.js
-sign*.sh
-notarize*.sh
-
 # Credentials and secrets
 credentials*.json
 secrets*.json
