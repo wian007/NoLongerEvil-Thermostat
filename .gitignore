@@ -6,15 +6,9 @@ yarn-error.log*
 pnpm-debug.log*
 .pnpm-store/
 
-# Package manager lockfiles
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
 # Build outputs and distribution
 dist/
 dist-electron/
-build/
 out/
 .next/
 *.app
