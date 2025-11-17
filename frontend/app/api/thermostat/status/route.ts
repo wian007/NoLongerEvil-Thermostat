@@ -1,11 +1,9 @@
-import { clerkClient, getAuth } from '@clerk/nextjs/server';
+import { getAuth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  ensureConvexUser,
   fetchConvexState,
   listConvexUserDevices,
   getWeatherBySerial,
-  syncUserWeatherFromDevice,
 } from '@/lib/server/convex';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8081';
@@ -14,6 +12,10 @@ type StateResponse = {
   devices: string[];
   deviceState: Record<string, Record<string, any>>;
 };
+
+// Weather cache with 30 minute TTL
+const weatherCache = new Map<string, { data: any; timestamp: number }>();
+const WEATHER_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 function emptyState(): StateResponse {
   return { devices: [], deviceState: {} };
@@ -35,10 +37,22 @@ function filterStateBySerials(data: any, serials: string[]): StateResponse {
   const filteredState: Record<string, Record<string, any>> = {};
   const filteredDevices: string[] = [];
 
+  const allowedPrefixes = ['user.', 'device.', 'shared.', 'schedule.', 'structure.'];
+
   for (const serial of serials) {
     if (data.deviceState && data.deviceState[serial]) {
-      filteredState[serial] = data.deviceState[serial];
-      filteredDevices.push(serial);
+      const serialState: Record<string, any> = {};
+
+      for (const [key, value] of Object.entries(data.deviceState[serial])) {
+        if (allowedPrefixes.some(prefix => key.startsWith(prefix))) {
+          serialState[key] = value;
+        }
+      }
+
+      if (Object.keys(serialState).length > 0) {
+        filteredState[serial] = serialState;
+        filteredDevices.push(serial);
+      }
     }
   }
 
@@ -72,7 +86,19 @@ async function fetchBackendState(serials: string[]): Promise<StateResponse> {
 async function injectWeatherData(stateResponse: StateResponse): Promise<StateResponse> {
   for (const serial of stateResponse.devices) {
     try {
-      const weatherData = await getWeatherBySerial(serial);
+      const now = Date.now();
+      const cached = weatherCache.get(serial);
+
+      let weatherData;
+      if (cached && (now - cached.timestamp) < WEATHER_CACHE_TTL) {
+        weatherData = cached.data;
+      } else {
+        weatherData = await getWeatherBySerial(serial);
+        if (weatherData) {
+          weatherCache.set(serial, { data: weatherData, timestamp: now });
+        }
+      }
+
       if (weatherData?.data) {
         const postalCode = weatherData.postalCode || '';
         const country = weatherData.country || '';
@@ -127,20 +153,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    try {
-      const client = await clerkClient();
-      const user = await client.users.getUser(userId);
-      const primaryEmailId = user?.primaryEmailAddressId;
-      const primaryEmail =
-        user?.emailAddresses?.find((address) => address.id === primaryEmailId)?.emailAddress ??
-        user?.emailAddresses?.[0]?.emailAddress ??
-        '';
-      if (primaryEmail) {
-        await ensureConvexUser(userId, primaryEmail);
-      }
-    } catch {
-    }
-
     // Get owned devices
     const ownedDevices = await listConvexUserDevices(userId);
     const ownedSerials = ownedDevices
@@ -181,13 +193,6 @@ export async function GET(request: NextRequest) {
 
     if (serials.length === 0) {
       return NextResponse.json(emptyState());
-    }
-
-    // Sync weather from device postal code to user state
-    try {
-      await syncUserWeatherFromDevice(userId);
-    } catch (error) {
-      console.error('[API] Failed to sync user weather:', error);
     }
 
     const convexData = await fetchConvexState();
