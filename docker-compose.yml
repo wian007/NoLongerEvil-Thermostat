@@ -2,9 +2,10 @@ services:
   nolongerevil:
     container_name: nolongerevil
     image: nolongerevil
+    build: .
     restart: unless-stopped
     ports:
-      - 80:80
+      - 80:80      
     volumes:
       - ./server/.env.local:/app/.env.local
     depends_on:
