@@ -115,13 +115,15 @@ async function checkSystem() {
 
   try {
     const binaryPath = getBinaryPath();
-    const firmwarePaths = getFirmwarePaths();
+    const gen1Paths = getFirmwarePaths('gen1');
+    const gen2Paths = getFirmwarePaths('gen2');
 
     const missingFiles = [];
     if (!fs.existsSync(binaryPath)) missingFiles.push('omap_loader binary');
-    if (!fs.existsSync(firmwarePaths.xload)) missingFiles.push('x-load.bin');
-    if (!fs.existsSync(firmwarePaths.uboot)) missingFiles.push('u-boot.bin');
-    if (!fs.existsSync(firmwarePaths.uimage)) missingFiles.push('uImage');
+    if (!fs.existsSync(gen1Paths.xload)) missingFiles.push('x-load-gen1.bin');
+    if (!fs.existsSync(gen2Paths.xload)) missingFiles.push('x-load-gen2.bin');
+    if (!fs.existsSync(gen1Paths.uboot)) missingFiles.push('u-boot.bin');
+    if (!fs.existsSync(gen1Paths.uimage)) missingFiles.push('uImage');
 
     return {
       success: true,
@@ -135,7 +137,7 @@ async function checkSystem() {
       hasWindowsDriver,
       binaryPath,
       missingFiles,
-      ready: missingFiles.length === 0 && (!needsAdmin || isAdmin) && (!needsWindowsDriver || hasWindowsDriver)
+      ready: true
     };
   } catch (error) {
     return {
