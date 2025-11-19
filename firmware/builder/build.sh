@@ -43,12 +43,13 @@ API_URL_SET=false
 NON_INTERACTIVE=false
 NEED_CUSTOM_BUILD=false
 FORCE_BUILD=false
-GENERATION="gen2"
-GENERATION_SET=true
+GENERATIONS=()
+GENERATION_SET=false
 DEBUG_PAUSE=false
 ENABLE_BACKPLATE_SIM=false
 ENABLE_ROOT_ACCESS=false
 ROOT_PASSWORD=""
+HOSTED_MODE=false
 
 if [ -t 1 ]; then
   RED='\033[0;31m'
@@ -112,13 +113,24 @@ Options:
   --api-url <url>          Override the default API URL used by the firmware
   --build-xloader          Build x-loader from source instead of using prebuilt
   --build-uboot            Build u-boot from source instead of using prebuilt
-  --generation <gen>       Specify Nest generation: gen1 or gen2 (default: gen2)
+  --generation <gen>       Specify Nest generation: gen1, gen2, or both (can be specified multiple times)
+                           Examples: --generation gen1 --generation gen2 OR --generation both
   --force-build            Force rebuild of kernel even if API URL is default
   --debug-pause            Pause after extracting initramfs for manual editing
   --enable-backplate-sim   Enable backplate simulator in firmware
   --enable-root-access     Enable root access with generated password
   --yes, -y                Run non-interactively with the provided values
   --help, -h               Show this help message
+
+Examples:
+  Build for both generations (CI/CD use case):
+    $(basename "$0") --generation both --yes
+
+  Build for specific generation:
+    $(basename "$0") --generation gen1 --yes
+
+  Build for multiple generations individually:
+    $(basename "$0") --generation gen1 --generation gen2 --yes
 EOF
 }
 
@@ -148,15 +160,19 @@ parse_args() {
       --generation)
         shift
         if [ -z "${1:-}" ]; then
-          print_error "--generation requires a value (gen1 or gen2)"
+          print_error "--generation requires a value (gen1, gen2, or both)"
           exit 1
         fi
-        if [ "$1" != "gen1" ] && [ "$1" != "gen2" ]; then
-          print_error "Invalid generation: $1. Must be 'gen1' or 'gen2'"
+        if [ "$1" = "both" ]; then
+          GENERATIONS=("gen1" "gen2")
+          GENERATION_SET=true
+        elif [ "$1" = "gen1" ] || [ "$1" = "gen2" ]; then
+          GENERATIONS+=("$1")
+          GENERATION_SET=true
+        else
+          print_error "Invalid generation: $1. Must be 'gen1', 'gen2', or 'both'"
           exit 1
         fi
-        GENERATION="$1"
-        GENERATION_SET=true
         shift
         ;;
       --force-build)
@@ -179,6 +195,10 @@ parse_args() {
         ;;
       --yes|-y|--non-interactive)
         NON_INTERACTIVE=true
+        shift
+        ;;
+      --hosted)
+        HOSTED_MODE=true
         shift
         ;;
       --help|-h)
@@ -305,11 +325,15 @@ configure_build() {
     echo
 
     if ask_yes_no "Are you building for Gen 2 (j49)?" "y"; then
-      GENERATION="gen2"
+      GENERATIONS=("gen2")
     else
-      GENERATION="gen1"
+      GENERATIONS=("gen1")
     fi
     echo
+  fi
+
+  if [ ${#GENERATIONS[@]} -eq 0 ]; then
+    GENERATIONS=("gen2")
   fi
 
   if [ "$BUILD_XLOADER_SET" != true ]; then
@@ -359,7 +383,7 @@ configure_build() {
 
   echo
   echo -e "${BOLD}Build Summary:${NC}"
-  echo "  Generation:          $GENERATION"
+  echo "  Generation(s):       ${GENERATIONS[*]}"
   echo "  x-loader:            $([ "$BUILD_XLOADER" = true ] && echo "Build from source" || echo "Use pre-compiled")"
   echo "  u-boot:              $([ "$BUILD_UBOOT" = true ] && echo "Build from source" || echo "Use pre-compiled")"
   echo "  API URL:             $API_URL"
@@ -376,12 +400,32 @@ configure_build() {
   fi
 }
 
-build_firmware() {
+build_for_generation() {
+  local gen="$1"
+
+  print_section "Building for Generation: $gen"
+
+  if [ "$BUILD_XLOADER" = true ] || [ "$BUILD_UBOOT" = true ]; then
+    local bootloader_args=""
+    [ "$BUILD_XLOADER" = true ] && bootloader_args="$bootloader_args --xloader"
+    [ "$BUILD_UBOOT" = true ] && bootloader_args="$bootloader_args --uboot"
+    bootloader_args="$bootloader_args --generation $gen"
+
+    bash scripts/build-bootloaders.sh $bootloader_args
+
+    if [ "$BUILD_XLOADER" = true ] && [ -f "$FIRMWARE_DIR/x-load.bin" ]; then
+      mv "$FIRMWARE_DIR/x-load.bin" "$FIRMWARE_DIR/x-load-${gen}.bin"
+      print_success "Renamed x-load.bin to x-load-${gen}.bin"
+    fi
+  fi
+}
+
+build_firmware_multi_gen() {
   print_section "Building Firmware"
-  
+
   if [ "$BUILD_XLOADER" = true ]; then
-    rm -f "$SCRIPT_DIR/firmware/x-load.bin" 2>/dev/null || true
-    rm -f "$SCRIPT_DIR/../installer/resources/firmware/x-load.bin" 2>/dev/null || true
+    rm -f "$SCRIPT_DIR/firmware/x-load"*.bin 2>/dev/null || true
+    rm -f "$SCRIPT_DIR/../installer/resources/firmware/x-load"*.bin 2>/dev/null || true
   fi
 
   if [ "$BUILD_UBOOT" = true ]; then
@@ -394,20 +438,11 @@ build_firmware() {
     rm -f "$SCRIPT_DIR/../installer/resources/firmware/uImage" 2>/dev/null || true
   fi
 
-  if [ "$BUILD_XLOADER" = true ] || [ "$BUILD_UBOOT" = true ]; then
-    local bootloader_args=""
-    [ "$BUILD_XLOADER" = true ] && bootloader_args="$bootloader_args --xloader"
-    [ "$BUILD_UBOOT" = true ] && bootloader_args="$bootloader_args --uboot"
-    bootloader_args="$bootloader_args --generation $GENERATION"
+  for gen in "${GENERATIONS[@]}"; do
+    build_for_generation "$gen"
+  done
 
-    bash scripts/build-bootloaders.sh $bootloader_args
-  else
-    if [ ! -f "$FIRMWARE_DIR/x-load.bin" ]; then
-      print_warning "Pre-compiled x-load.bin not found"
-    else
-      print_success "Using pre-compiled x-load.bin"
-    fi
-
+  if [ "$BUILD_UBOOT" = false ]; then
     if [ ! -f "$FIRMWARE_DIR/u-boot.bin" ]; then
       print_warning "Pre-compiled u-boot.bin not found"
     else
@@ -448,7 +483,47 @@ build_firmware() {
 
       CA_CERT_CONTENT=""
       USE_CUSTOM_CERT=false
-      if [ "$API_URL" != "https://backdoor.nolongerevil.com" ] && [ -f "/server/certs/ca-cert.pem" ]; then
+
+      # For hosted mode or default API URL, use the default NoLongerEvil certificate
+      if [ "$HOSTED_MODE" = true ] || [ "$API_URL" = "https://backdoor.nolongerevil.com" ]; then
+        CA_CERT_CONTENT="-----BEGIN CERTIFICATE-----
+MIIF+TCCA+GgAwIBAgIUP0dbiF2u6BuJE/7m7jN1amlzSnowDQYJKoZIhvcNAQEL
+BQawgYsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRIwEAYDVQQH
+DAlQYWxvIEFsdG8xEjAQBgNVBAoMCU5lc3QgTGFiczENMAsGA1UECwwETmVzdDEw
+MC4GA1UEAwwnTmVzdCBQcml2YXRlIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5
+MB4XDTI1MTAzMTA3MzMzMVoXDTM1MTAyOTA3MzMzMVowgYsxCzAJBgNVBAYTAlVT
+MRMwEQYDVQQIDApDYWxpZm9ybmlhMRIwEAYDVQQHDAlQYWxvIEFsdG8xEjAQBgNV
+BAoMCU5lc3QgTGFiczENMAsGA1UECwwETmVzdDEwMC4GA1UEAwwnTmVzdCBQcml2
+YXRlIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5MIICIjANBgkqhkiG9w0BAQEF
+AAOCAg8AMIICCgKCAgEAyh0CaWTZpfA9FV1/Qeaauo0LngDTvMFZYwT8+WP1R5s2
+FYFNH4LKZ+Csqyi62TBTWSojUxLIl4oJzZ6ZajmELCFV0PdrI001fo2IA1LQeCli
+aC03eqv4jl0hQYS4zc36h1EbFnckM8YeSmiu/lj42Dk1oZHNbZh1u4oMS7eGaf9B
+WfbyBAUZsIMv/khFn41RdaQ03ugeSVGqE82Ilc0IV081GPzL3T/i3W5UEF3I6rXv
+s7+jOmw/VT5oXHO2shU/x3dKE4ET3c27exyotCD8pTi2FWUAJ+XwrrRYKBh0iN6g
+m+Cb3u63d7w/sSjEnc9TFcpDhXEmRJPKnzL0y+SOG90AhVujVAuwWJIcimvG0V27
+hF2CYoayEE145E6F0q7SlGA5XNuZdSDvj8iRk12YNk6AIgmv4bfPbg8gwuCnY7FC
+IsCm2VNYmQauO67/Wll4RyTnMjiXoTLgf3xVPXBi4tYpaSw1gAHVTyIYxqJB8nK6
+ygojl0Sv9lbdjRqVzz3BWmWsKUoCoRCWxsjFXW/l7HxdQzXwvmwDsYQMGMpluQ8Z
+MEDj7fzraJGJCm51DK6bqAJY3EPAMOe/SJfIjCwBufUPLfL6RbS+FsmqlVy+MJaU
+c+1HPf0kEODofqvV4UXPNJdyWC1JmpbSjvLlPSdtpWsdi6977o23M0DwJuKdg4kC
+AwEAAaNTMFEwHQYDVR0OBBYEFBPKTGQVE2zfjT413yF62DKf/V4EMB8GA1UdIwQY
+MBaAFBPKTGQVE2zfjT413yF62DKf/V4EMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZI
+hvcNAQELBQADggIBAKN2CUATqajgalzkeyrUPBXBZDIrE7XwuVcosyuDqReAIiHV
+9dxL3yEtQo2L5FQIOTqHgzEgtCLBSXW4jQFRbiFszxGoDWOUqnCnWasrEYjkyBJN
+3jPoEDkLNEX5nLe4KbWoJLpcm9AS0jeyoSfFQebmCCO95+OQ2/UDKcU6rbPRvdun
+9k9/g/53HEB8hlLhA0OJHQVSCokCTOae9+WsVnw5OqFyz9hALr0Ur2MCLu/l9A0X
+cXTpJ0kSc63emDnEakE/uOO6IPnoYPCPg5WPRU6TjvgcjfulathNv0hst6lz8Sd3
+5pfFw09OV20fNJ+5RnvRlVtAPrdTFLxzQNnOQZU8ZUzWunzey6BCCRI0N1QwPkXe
+TEZAy/pzx13AqBpy+Hl5FiOu6xAmLD7OpCSqCD8DIbHDdPZoEZnA5290dfZhBgmx
+LPBj5HsJWJQ57agUQZBHmegaiB9fJqlcJ4CblPRhkELSszN5psPrAolZysquVuv8
+EhULhOcnoCE+4dp6o4klYSoLkg8rVWyVa5f4iDwD51DMAcsAs2TU6mvIVHRodlu1
+u7+mT2BE1N5Y2xuBnDXFy/fzYT/XferYBOHP7+rWSopJH4epRJnp55lUsEAyP0VQ
++O8glPffIxvKO2/1ZxPHotDoSZtWe28cHUODojbsd1PpfCioQqkrUzWNLoZw
+-----END CERTIFICATE-----"
+        USE_CUSTOM_CERT=true
+        print_success "Loaded default NoLongerEvil CA certificate for embedding"
+      # For self-hosted mode with custom API URL, try to load custom certificate
+      elif [ -f "/server/certs/ca-cert.pem" ]; then
         CA_CERT_CONTENT=$(cat /server/certs/ca-cert.pem)
         USE_CUSTOM_CERT=true
         print_success "Loaded custom CA certificate for embedding"
@@ -571,21 +646,18 @@ ROOTME_EOF
     SIZE=$(du -h "$SCRIPT_DIR/deps/linux/initramfs_data.cpio" | cut -f1)
     print_success "Repacked initramfs ($SIZE)"
 
-    # Verify repacked CPIO integrity
     if [ -f "$SCRIPT_DIR/deps/initramfs_data.cpio" ]; then
       print_info "Verifying CPIO integrity..."
 
       ORIG_CPIO="$SCRIPT_DIR/deps/initramfs_data.cpio"
       NEW_CPIO="$SCRIPT_DIR/deps/linux/initramfs_data.cpio"
 
-      # Extract both to temp directories for comparison
       ORIG_TMP=$(mktemp -d)
       NEW_TMP=$(mktemp -d)
 
       (cd "$ORIG_TMP" && cpio -id < "$ORIG_CPIO" 2>/dev/null)
       (cd "$NEW_TMP" && cpio -id < "$NEW_CPIO" 2>/dev/null)
 
-      # Count files, directories, and symlinks
       ORIG_FILES=$(find "$ORIG_TMP" -type f | wc -l)
       ORIG_DIRS=$(find "$ORIG_TMP" -type d | wc -l)
       ORIG_LINKS=$(find "$ORIG_TMP" -type l | wc -l)
@@ -597,7 +669,6 @@ ROOTME_EOF
       echo "  Original: $ORIG_FILES files, $ORIG_DIRS dirs, $ORIG_LINKS symlinks"
       echo "  Repacked: $NEW_FILES files, $NEW_DIRS dirs, $NEW_LINKS symlinks"
 
-      # Check for differences (case-sensitive filenames are preserved)
       DIFF_OUTPUT=$(diff -rq "$ORIG_TMP" "$NEW_TMP" 2>/dev/null | grep -v "^Only in" || true)
       ADDED_FILES=$(diff -rq "$ORIG_TMP" "$NEW_TMP" 2>/dev/null | grep "^Only in $NEW_TMP" | wc -l)
       REMOVED_FILES=$(diff -rq "$ORIG_TMP" "$NEW_TMP" 2>/dev/null | grep "^Only in $ORIG_TMP" | wc -l)
@@ -614,7 +685,6 @@ ROOTME_EOF
 
       print_success "CPIO verification complete"
 
-      # Cleanup
       rm -rf "$ORIG_TMP" "$NEW_TMP"
     fi
 
@@ -627,7 +697,6 @@ ROOTME_EOF
 
     bash scripts/build-kernel.sh
 
-    # Clean up extracted files after successful build
     if [ $? -eq 0 ]; then
       rm -rf "$SCRIPT_DIR/deps/root"
       print_info "Cleaned up extracted initramfs"
@@ -647,19 +716,21 @@ print_results() {
   echo -e "${BOLD}Firmware files:${NC}"
   echo
 
-  if [ -f "$FIRMWARE_DIR/x-load.bin" ]; then
-    SIZE=$(du -h "$FIRMWARE_DIR/x-load.bin" | cut -f1)
-    echo "  x-load.bin    $SIZE"
-  fi
+  for gen in "${GENERATIONS[@]}"; do
+    if [ -f "$FIRMWARE_DIR/x-load-${gen}.bin" ]; then
+      SIZE=$(du -h "$FIRMWARE_DIR/x-load-${gen}.bin" | cut -f1)
+      echo "  x-load-${gen}.bin    $SIZE"
+    fi
+  done
 
   if [ -f "$FIRMWARE_DIR/u-boot.bin" ]; then
     SIZE=$(du -h "$FIRMWARE_DIR/u-boot.bin" | cut -f1)
-    echo "  u-boot.bin    $SIZE"
+    echo "  u-boot.bin         $SIZE"
   fi
 
   if [ -f "$FIRMWARE_DIR/uImage" ]; then
     SIZE=$(du -h "$FIRMWARE_DIR/uImage" | cut -f1)
-    echo "  uImage        $SIZE"
+    echo "  uImage             $SIZE"
   fi
 
   echo
@@ -701,7 +772,7 @@ main() {
   check_dependencies
   configure_build
   setup_dependencies
-  build_firmware
+  build_firmware_multi_gen
   print_results
 }
 

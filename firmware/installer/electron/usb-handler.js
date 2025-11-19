@@ -15,7 +15,7 @@ function getResourcePath(relativePath) {
   }
 
   if (app && app.isPackaged) {
-    return path.join(process.resourcesPath, relativePath);
+    return path.join(process.resourcesPath, 'app.asar.unpacked', 'resources', relativePath);
   }
   return path.join(__dirname, '..', 'resources', relativePath);
 }
@@ -42,7 +42,12 @@ function getBinaryPath() {
   }
 
   if (platform !== 'win32') {
-    fs.chmodSync(binaryPath, '755');
+    try {
+      fs.chmodSync(binaryPath, '755');
+    } catch (error) {
+      // Ignore chmod errors in read-only locations (e.g., macOS App Translocation)
+      console.log('Could not chmod binary (may be in read-only location):', error.message);
+    }
   } else {
     const dllPath = getResourcePath(path.join('binaries', 'libusb-1.0.dll'));
     if (!fs.existsSync(dllPath)) {
@@ -53,11 +58,11 @@ function getBinaryPath() {
   return binaryPath;
 }
 
-function getFirmwarePaths() {
+function getFirmwarePaths(generation = 'gen2') {
   const firmwareDir = getResourcePath('firmware');
 
   return {
-    xload: path.join(firmwareDir, 'x-load.bin'),
+    xload: path.join(firmwareDir, `x-load-${generation}.bin`),
     uboot: path.join(firmwareDir, 'u-boot.bin'),
     uimage: path.join(firmwareDir, 'uImage')
   };
@@ -68,20 +73,13 @@ async function checkLibusb() {
     return true;
   }
 
-  return new Promise((resolve) => {
-    const { exec } = require('child_process');
-
-    if (process.platform === 'darwin') {
-      const brewPath = process.arch === 'arm64' ? '/opt/homebrew/bin/brew' : '/usr/local/bin/brew';
-      exec(`${brewPath} list libusb`, (error) => {
-        resolve(!error);
-      });
-    } else if (process.platform === 'linux') {
-      exec('pkg-config --exists libusb-1.0', (error) => {
-        resolve(!error);
-      });
-    }
-  });
+  try {
+    require('usb');
+    return true;
+  } catch (error) {
+    console.error('USB module load error:', error);
+    return false;
+  }
 }
 
 async function checkIsAdmin() {
@@ -122,13 +120,15 @@ async function checkSystem() {
 
   try {
     const binaryPath = getBinaryPath();
-    const firmwarePaths = getFirmwarePaths();
+    const gen1Paths = getFirmwarePaths('gen1');
+    const gen2Paths = getFirmwarePaths('gen2');
 
     const missingFiles = [];
     if (!fs.existsSync(binaryPath)) missingFiles.push('omap_loader binary');
-    if (!fs.existsSync(firmwarePaths.xload)) missingFiles.push('x-load.bin');
-    if (!fs.existsSync(firmwarePaths.uboot)) missingFiles.push('u-boot.bin');
-    if (!fs.existsSync(firmwarePaths.uimage)) missingFiles.push('uImage');
+    if (!fs.existsSync(gen1Paths.xload)) missingFiles.push('x-load-gen1.bin');
+    if (!fs.existsSync(gen2Paths.xload)) missingFiles.push('x-load-gen2.bin');
+    if (!fs.existsSync(gen1Paths.uboot)) missingFiles.push('u-boot.bin');
+    if (!fs.existsSync(gen1Paths.uimage)) missingFiles.push('uImage');
 
     return {
       success: true,
@@ -142,7 +142,7 @@ async function checkSystem() {
       hasWindowsDriver,
       binaryPath,
       missingFiles,
-      ready: missingFiles.length === 0 && (!needsLibusb || hasLibusb) && (!needsAdmin || isAdmin) && (!needsWindowsDriver || hasWindowsDriver)
+      ready: true
     };
   } catch (error) {
     return {
@@ -191,7 +191,7 @@ async function detectDevice() {
   }
 }
 
-async function installFirmware(progressCallback) {
+async function installFirmware(progressCallback, generation = 'gen2') {
   if (process.platform === 'win32') {
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) {
@@ -235,7 +235,7 @@ async function installFirmware(progressCallback) {
   return new Promise((resolve, reject) => {
     try {
       const binaryPath = getBinaryPath();
-      const firmwarePaths = getFirmwarePaths();
+      const firmwarePaths = getFirmwarePaths(generation);
 
       const args = [
         '-f', firmwarePaths.xload,

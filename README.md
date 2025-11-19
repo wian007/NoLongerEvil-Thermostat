@@ -8,146 +8,33 @@
 
 This firmware loader uses the OMAP bootloader interface to flash custom bootloader and kernel images to Nest Thermostat devices. The device must be put into DFU mode to accept new firmware.
 
-**Important:** After flashing this firmware, your device will no longer contact Nest/Google servers. It will operate independently and connect to the NoLongerEvil platform instead, giving you complete control over your thermostat.
+**Supported Devices:**
+- Nest Learning Thermostat Gen 1 (Diamond) - Fully supported
+- Nest Learning Thermostat Gen 2 (j49) - Fully supported
+
+**Important:** After flashing this firmware, your device will no longer contact Nest/Google servers. It will operate independently and connect to the No Longer Evil platform instead, giving you complete control over your thermostat.
 
 ## How it Works
 
 The custom firmware flashes the device with modified bootloader and kernel components that redirect all network traffic from the original Nest/Google servers to a server we specify. This server hosts a reverse-engineered replica of their API, allowing the thermostat to function independently while giving you complete control over your device data and settings.
 
-By intercepting the communication layer, the thermostat believes it's communicating with the official Nest infrastructure, but instead connects to the NoLongerEvil platform. This approach ensures full compatibility with the device's existing software while breaking free from Google's cloud dependency.
+By intercepting the communication layer, the thermostat believes it's communicating with the official Nest infrastructure, but instead connects to the No Longer Evil platform. This approach ensures full compatibility with the device's existing software while breaking free from Google's cloud dependency.
 
-## Self-Hosting Setup
+## Installation Options
 
-### Step 1: Clone the Repository
+Choose the installation method that best fits your needs:
 
-```bash
-git clone https://github.com/codykociemba/NoLongerEvil-Thermostat.git
-cd NoLongerEvil-Thermostat
-```
+### Hosted Install (Recommended for Most Users)
 
-### Step 2: Install Prerequisites
+Use our cloud-hosted No Longer Evil platform - no server setup required!
 
-#### Linux (Debian/Ubuntu)
+**[📖 View Hosted Installation Guide](https://docs.nolongerevil.com/hosted/overview)**
 
-```bash
-sudo apt-get update
-sudo apt-get install build-essential libusb-1.0-0-dev gcc pkg-config docker docker-compose
-```
+### Self-Hosted Install (Advanced Users)
 
-#### macOS
+Run your own No Longer Evil server infrastructure for complete control and privacy.
 
-```bash
-xcode-select --install
-brew install libusb pkg-config docker docker-compose
-```
-
-### Step 3: Build and Flash Firmware
-
-Run the installation script to build and flash the custom firmware:
-
-```bash
-chmod +x install.sh
-./install.sh
-```
-
-This will:
-
-- Prompt you for your API server URL
-- Build the firmware with Docker
-- Launch the Electron installer app
-- Guide you through flashing your Nest device
-
-### Step 4: Set Up Self-Hosted Convex
-
-Download and run Convex with Docker Compose:
-
-```bash
-curl -O https://raw.githubusercontent.com/get-convex/convex-backend/refs/heads/main/self-hosted/docker/docker-compose.yml
-docker compose up -d
-docker compose exec backend ./generate_admin_key.sh
-```
-
-Save the admin key that is generated.
-It will look like:
-
-```
-Admin key:
-convex-self-hosted|01949bdf5627839049029834...
-```
-
-### Step 5: Configure Environment Variables
-
-Both Convex and the NoLongerEvil application expect environment vars at `.env.local` instead of the traditional `.env`
-
-**Server** (`server/.env.local`):
-
-```bash
-CONVEX_SELF_HOSTED_URL=http://localhost:3210
-CONVEX_SELF_HOSTED_ADMIN_KEY=<admin-key-from-step-4>
-```
-
-### Step 6: Deploy Convex Schema
-
-This takes the "table" schema of the app and deploys it into Convex.
-
-```bash
-cd server
-npm install
-npx convex dev
-```
-
-When this step is done you can Ctrl+C to end the terminal
-
-### Step 7: Run Backend and Frontend
-
-**Development:**
-Run these in two separate terminals
-
-```bash
-# Terminal 1 - API Server
-cd server
-npm install
-npm run dev:ts
-
-# Terminal 2 - Web Dashboard
-cd frontend
-npm install
-npm run dev
-```
-
-**Production:**
-
-```bash
-cd server
-npm install
-npm run build
-
-cd ../frontend
-npm install
-npm run build
-
-npm install -g pm2
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
-```
-
-Visit `http://localhost:3000` to access the dashboard.
-
-### Step 8: Set up your instance
-
-From `http://localhost:3000`, Sign up for an account with an active email address . Clerk will email you a one-time login code.
-Follow the instructions from [https://docs.nolongerevil.com/hosted/installation#step-7:-register-account](https://docs.nolongerevil.com/hosted/installation#step-7:-register-account) onward to get an Entry Key and get your Nest active on your local server.
-
-## What Gets Flashed
-
-The firmware installation process installs three components:
-
-1. **x-load.bin** - First-stage bootloader (X-Loader for OMAP)
-2. **u-boot.bin** - Second-stage bootloader (Das U-Boot) loaded at address 0x80100000
-3. **uImage** - Linux kernel image loaded at address 0x80A00000
-
-After flashing, the device jumps to execution at 0x80100000 (u-boot).
+**[📖 View Self-Hosted Installation Guide](https://docs.nolongerevil.com/self-hosted/overview)**
 
 ## Security Considerations
 

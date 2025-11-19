@@ -9,7 +9,7 @@ const INSTALL_STAGES = {
   COMPLETE: 'complete',
 };
 
-function InstallScreen({ systemInfo, onSuccess, onError, onBack }) {
+function InstallScreen({ systemInfo, generation, onSuccess, onError, onBack }) {
   const [stage, setStage] = useState(INSTALL_STAGES.WAITING);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState('');
@@ -73,10 +73,10 @@ function InstallScreen({ systemInfo, onSuccess, onError, onBack }) {
     setStage(INSTALL_STAGES.WAITING);
     setMessage('Installation in progress...');
 
-    console.log('Starting firmware installation...');
+    console.log('Starting firmware installation...', 'Generation:', generation);
 
     try {
-      const result = await window.electronAPI.installFirmware();
+      const result = await window.electronAPI.installFirmware({ generation });
 
       console.log('Installation result:', result);
 

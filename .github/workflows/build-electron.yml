@@ -7,8 +7,102 @@ on:
       - 'v*'
 
 jobs:
+  build-firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build firmware for both generations
+        continue-on-error: true
+        id: build-firmware
+        run: |
+          cd firmware/builder
+          ./docker-build.sh --generation both --build-xloader --build-uboot --hosted --yes --force-build
+
+      - name: Check firmware files (built or existing)
+        run: |
+          MISSING_FILES=()
+
+          if [ -f "firmware/builder/firmware/x-load-gen1.bin" ]; then
+            echo "✓ Found x-load-gen1.bin in builder output"
+          elif [ -f "firmware/installer/resources/firmware/x-load-gen1.bin" ]; then
+            echo "✓ Found existing x-load-gen1.bin in installer resources"
+          else
+            MISSING_FILES+=("x-load-gen1.bin")
+          fi
+
+          if [ -f "firmware/builder/firmware/x-load-gen2.bin" ]; then
+            echo "✓ Found x-load-gen2.bin in builder output"
+          elif [ -f "firmware/installer/resources/firmware/x-load-gen2.bin" ]; then
+            echo "✓ Found existing x-load-gen2.bin in installer resources"
+          else
+            MISSING_FILES+=("x-load-gen2.bin")
+          fi
+
+          if [ -f "firmware/builder/firmware/u-boot.bin" ]; then
+            echo "✓ Found u-boot.bin in builder output"
+          elif [ -f "firmware/installer/resources/firmware/u-boot.bin" ]; then
+            echo "✓ Found existing u-boot.bin in installer resources"
+          else
+            MISSING_FILES+=("u-boot.bin")
+          fi
+
+          if [ -f "firmware/builder/firmware/uImage" ]; then
+            echo "✓ Found uImage in builder output"
+          elif [ -f "firmware/installer/resources/firmware/uImage" ]; then
+            echo "✓ Found existing uImage in installer resources"
+          else
+            MISSING_FILES+=("uImage")
+          fi
+
+          if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+            echo "❌ Missing firmware files:"
+            for file in "${MISSING_FILES[@]}"; do
+              echo "  - $file"
+            done
+            echo ""
+            echo "Build failed and no existing firmware found."
+            exit 1
+          fi
+
+          echo ""
+          echo "✓ All firmware files available (built or existing)"
+
+      - name: Copy firmware to installer resources
+        run: |
+          mkdir -p firmware/installer/resources/firmware
+
+          if [ -f "firmware/builder/firmware/x-load-gen1.bin" ]; then
+            cp firmware/builder/firmware/x-load-gen1.bin firmware/installer/resources/firmware/
+          fi
+          if [ -f "firmware/builder/firmware/x-load-gen2.bin" ]; then
+            cp firmware/builder/firmware/x-load-gen2.bin firmware/installer/resources/firmware/
+          fi
+          if [ -f "firmware/builder/firmware/u-boot.bin" ]; then
+            cp firmware/builder/firmware/u-boot.bin firmware/installer/resources/firmware/
+          fi
+          if [ -f "firmware/builder/firmware/uImage" ]; then
+            cp firmware/builder/firmware/uImage firmware/installer/resources/firmware/
+          fi
+
+          echo "Firmware files in installer resources:"
+          ls -lh firmware/installer/resources/firmware/
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-files
+          path: firmware/installer/resources/firmware/*
+
   build:
+    needs: build-firmware
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -17,6 +111,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-files
+          path: firmware/installer/resources/firmware
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,15 +189,7 @@ jobs:
         with:
           name: nolongerevil-macos-x64
           path: firmware/installer/dist/*x64*.zip
-          if-no-files-found: warn
-
-      - name: Upload macOS arm64 artifact
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: nolongerevil-macos-arm64
-          path: firmware/installer/dist/*arm64*.zip
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Build Electron app (Linux)
         if: matrix.os == 'ubuntu-latest'

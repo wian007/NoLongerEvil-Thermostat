@@ -85,9 +85,10 @@ ipcMain.handle('detect-device', async () => {
 
 ipcMain.handle('install-firmware', async (event, options) => {
   try {
+    const generation = options?.generation || 'gen2';
     const result = await installFirmware((progress) => {
       mainWindow.webContents.send('installation-progress', progress);
-    });
+    }, generation);
     return result;
   } catch (error) {
     console.error('Installation error:', error);
