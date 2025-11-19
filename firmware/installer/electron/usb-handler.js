@@ -42,7 +42,12 @@ function getBinaryPath() {
   }
 
   if (platform !== 'win32') {
-    fs.chmodSync(binaryPath, '755');
+    try {
+      fs.chmodSync(binaryPath, '755');
+    } catch (error) {
+      // Ignore chmod errors in read-only locations (e.g., macOS App Translocation)
+      console.log('Could not chmod binary (may be in read-only location):', error.message);
+    }
   } else {
     const dllPath = getResourcePath(path.join('binaries', 'libusb-1.0.dll'));
     if (!fs.existsSync(dllPath)) {
