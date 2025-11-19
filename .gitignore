@@ -119,6 +119,7 @@ next-env.d.ts
 
 # Convex
 **/convex/_generated/
+convex
 
 # Firmware build artifacts
 firmware/builder/firmware/

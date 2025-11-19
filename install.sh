@@ -146,7 +146,7 @@ write_env_file() {
   update_env_value "API_ORIGIN" "$1"
   update_env_value "PROXY_PORT" "$2"
   update_env_value "CONTROL_PORT" "$3"
-  cp "$ENV_TEMPLATE" "$SERVER_DIR/.env.local"
+  cp $ENV_TEMPLATE $SERVER_DIR/.env.local
 }
 
 generate_certs() {
