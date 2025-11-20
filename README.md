@@ -1,5 +1,7 @@
 # Nest Thermostat Firmware Setup
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-donate-yellow.svg)](https://buymeacoffee.com/codykociemba)
+
 > **⚠️ WARNING: EXPERIMENTAL SOFTWARE**
 >
 > This project is currently in the **experimental/testing phase**. Do NOT use this firmware on any thermostat that is critical for your heating or cooling needs. Flashing this firmware may brick your device or cause unexpected behavior. Only proceed if you have a backup thermostat or can afford to have your device non-functional during testing.
@@ -7,6 +9,11 @@
 ## A Note from the Developer
 
 This project has blown up way more than I ever expected! I want to be transparent: this was thrown together in a couple of days, so it's still very new and a work in progress. Thank you all so much for your support and enthusiasm!
+
+**Support the Project:**
+Developing and maintaining open-source projects takes a lot of time (and late nights). If this project helped you reclaim your device or you just want to support the effort to keep this hardware usable, consider buying me a coffee. It keeps the code flowing and the development going!
+
+<a href="https://buymeacoffee.com/codykociemba" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
 **Self-Hosted Open Source Option Available:** A self-hosted open source solution has been posted on the [`open-source-prototype`](https://github.com/codykociemba/NoLongerEvil-Thermostat/tree/open-source-prototype) branch. Check out the [discussion here](https://github.com/codykociemba/NoLongerEvil-Thermostat/discussions/34) for more details.
 
