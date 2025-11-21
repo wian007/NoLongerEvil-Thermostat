@@ -12,10 +12,10 @@ else
     case "$OS" in
         Linux*)
             PLATFORM="linux"
-            print_info "Running on native Linux"
+            echo "Running on native Linux"
             ;;
         *)
-            print_error "Non-Linux platform detected: $OS"
+            echo "Non-Linux platform detected: $OS"
             echo ""
             echo "This build system uses an ARM toolchain compiled for Linux."
             echo "Please use the Docker build script instead:"
