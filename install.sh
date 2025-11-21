@@ -655,7 +655,7 @@ if [ "$HOSTING_MODE" = "hosted" ]; then
   SHOULD_BUILD_FIRMWARE=true
   echo "Building hosted firmware for $NEST_GENERATION..."
 elif [ "$HOSTING_MODE" = "selfhosted" ]; then
-  if [ -f "firmware/installer/resources/firmware/x-load.bin" ] && [ -f "firmware/installer/resources/firmware/u-boot.bin" ] && [ -f "firmware/installer/resources/firmware/uImage" ]; then
+  if [ -f "firmware/installer/resources/firmware/x-load-$NEST_GENERATION.bin" ] && [ -f "firmware/installer/resources/firmware/u-boot.bin" ] && [ -f "firmware/installer/resources/firmware/uImage" ]; then
     echo ""
     if [ "$BUILD_ONLY" = true ] || prompt_yes_no "Firmware files already exist. Rebuild them?" "n"; then
       SHOULD_BUILD_FIRMWARE=true
