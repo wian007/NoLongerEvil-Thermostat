@@ -198,8 +198,9 @@ build_firmware() {
   if [ "$enable_backplate" = true ]; then
     build_args="$build_args --enable-backplate-sim"
   fi
-
-  local build_log="$ROOT_DIR/firmware_build.log"
+  
+  local build_date_time=`date +"%m%d%Y-%H%M%S"`
+  local build_log="$ROOT_DIR/firmware_build_$build_date_time.log"
   (cd "$BUILDER_DIR" && bash docker-build.sh $build_args) | tee "$build_log"
 
   FIRMWARE_ROOT_PASSWORD=$(grep "Password:" "$build_log" | grep -oE "[A-Za-z0-9]{18}" | tail -1)
@@ -655,7 +656,7 @@ if [ "$HOSTING_MODE" = "hosted" ]; then
   SHOULD_BUILD_FIRMWARE=true
   echo "Building hosted firmware for $NEST_GENERATION..."
 elif [ "$HOSTING_MODE" = "selfhosted" ]; then
-  if [ -f "firmware/installer/resources/firmware/x-load.bin" ] && [ -f "firmware/installer/resources/firmware/u-boot.bin" ] && [ -f "firmware/installer/resources/firmware/uImage" ]; then
+  if [ -f "firmware/installer/resources/firmware/x-load-$NEST_GENERATION.bin" ] && [ -f "firmware/installer/resources/firmware/u-boot.bin" ] && [ -f "firmware/installer/resources/firmware/uImage" ]; then
     echo ""
     if [ "$BUILD_ONLY" = true ] || prompt_yes_no "Firmware files already exist. Rebuild them?" "n"; then
       SHOULD_BUILD_FIRMWARE=true
