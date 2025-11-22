@@ -72,29 +72,19 @@ export const getDeviceState = query({
   },
 });
 
+/**
+ * DEPRECATED: This query had no access control and is a security risk.
+ * Use getUserDevicesState instead which checks user permissions.
+ *
+ * This is kept only for backward compatibility but returns empty data.
+ */
 export const getAllState = query({
   args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query("states").collect();
-    const deviceState: Record<string, Record<string, any>> = {};
-    const devices = new Set<string>();
-
-    for (const row of rows) {
-      const serial = row.serial;
-      devices.add(serial);
-      const bucket = (deviceState[serial] ||= {});
-      bucket[row.object_key] = {
-        object_key: row.object_key, // Include object_key in the response
-        object_revision: row.object_revision,
-        object_timestamp: row.object_timestamp,
-        value: row.value,
-        updatedAt: row.updatedAt,
-      };
-    }
-
+  handler: async () => {
+    console.warn('[DEPRECATED] getAllState query called - this query is deprecated and returns empty data. Use getUserDevicesState instead.');
     return {
-      devices: Array.from(devices),
-      deviceState,
+      devices: [],
+      deviceState: {},
     };
   },
 });
@@ -136,7 +126,6 @@ export const getUserDevicesState = query({
     // Get all state rows for accessible devices
     const allStates = await ctx.db.query("states").collect();
     const deviceState: Record<string, Record<string, any>> = {};
-    const devices = new Set<string>();
 
     for (const row of allStates) {
       if (!accessibleSerials.has(row.serial)) {
@@ -144,7 +133,6 @@ export const getUserDevicesState = query({
       }
 
       const serial = row.serial;
-      devices.add(serial);
       const bucket = (deviceState[serial] ||= {});
       bucket[row.object_key] = {
         object_key: row.object_key,
@@ -155,8 +143,9 @@ export const getUserDevicesState = query({
       };
     }
 
+    // Return ALL accessible devices, even if they have no state yet
     return {
-      devices: Array.from(devices),
+      devices: Array.from(accessibleSerials),
       deviceState,
     };
   },
@@ -213,6 +202,34 @@ export const getUserDeviceState = query({
       serial: args.serial,
       state: deviceState,
       hasWriteAccess: Boolean(ownership || sharedAccess?.permissions.includes("control")),
+    };
+  },
+});
+
+/**
+ * Debug query to check database contents
+ */
+export const debugDatabase = query({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const deviceOwners = await ctx.db
+      .query("deviceOwners")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    const allStates = await ctx.db.query("states").collect();
+
+    return {
+      userId: args.userId,
+      deviceOwnersCount: deviceOwners.length,
+      deviceOwners: deviceOwners.map(d => ({ serial: d.serial, createdAt: d.createdAt })),
+      totalStatesCount: allStates.length,
+      statesByDevice: allStates.reduce((acc, state) => {
+        acc[state.serial] = (acc[state.serial] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
     };
   },
 });

@@ -6,7 +6,14 @@ import { QueryProvider } from "@/lib/query-client";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { ReactNode } from "react";
 
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+console.log('[Providers] Initializing Convex with URL:', convexUrl);
+
+if (!convexUrl) {
+  console.error('[Providers] NEXT_PUBLIC_CONVEX_URL is not set!');
+}
+
+const convex = new ConvexReactClient(convexUrl!);
 
 type ProvidersProps = {
   children: ReactNode;

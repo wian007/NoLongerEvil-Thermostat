@@ -6,7 +6,7 @@ import {
   getWeatherBySerial,
 } from '@/lib/server/convex';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8081';
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8081';
 
 type StateResponse = {
   devices: string[];

@@ -36,7 +36,15 @@ export function useDeviceState() {
   );
 
   const result = useMemo(() => {
+    console.log('[useDeviceState] Query result:', {
+      hasData: !!data,
+      userId,
+      deviceCount: data?.devices?.length,
+      serials: data?.devices
+    });
+
     if (!data) {
+      console.log('[useDeviceState] No data yet, returning loading state');
       return {
         devices: [] as DeviceData[],
         userState: null as UserState | null,
@@ -50,12 +58,14 @@ export function useDeviceState() {
       return parseDeviceState(serial, state);
     });
 
+    console.log('[useDeviceState] Parsed devices:', parsedDevices.map(d => d.serial));
+
     return {
       devices: parsedDevices,
       userState: extractUserState(data),
       isLoading: false,
     };
-  }, [data]);
+  }, [data, userId]);
 
   return result;
 }

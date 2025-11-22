@@ -283,8 +283,8 @@ async function startServers(): Promise<void> {
   }
 
   const controlServer = http.createServer(handleControlRequest);
-  controlServer.listen(environment.CONTROL_PORT, () => {
-    console.log(`[Control API] HTTP server listening on port ${environment.CONTROL_PORT}`);
+  controlServer.listen(environment.CONTROL_PORT, '127.0.0.1', () => {
+    console.log(`[Control API] HTTP server listening on localhost:${environment.CONTROL_PORT}`);
   });
 
   console.log('[Integrations] Loading enabled integrations...');
