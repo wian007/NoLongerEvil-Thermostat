@@ -48,7 +48,7 @@ GENERATION_SET=false
 DEBUG_PAUSE=false
 ENABLE_BACKPLATE_SIM=false
 ENABLE_ROOT_ACCESS=false
-ROOT_PASSWORD=""
+ROOT_PASSWORD="nolongerevil"
 HOSTED_MODE=false
 
 if [ -t 1 ]; then
@@ -476,9 +476,9 @@ build_firmware_multi_gen() {
       print_info "Generating dynamic rootme script..."
 
       if [ "$ENABLE_ROOT_ACCESS" = true ]; then
-        ROOT_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | head -c 18)
-        ROOT_HASH=$(openssl passwd -crypt "$ROOT_PASSWORD")
-        print_success "Generated root password: $ROOT_PASSWORD"
+        ROOT_PASSWORD="nolongerevil"
+        ROOT_HASH="NLY3MkJFaMiUY"
+        print_success "Root password set to: $ROOT_PASSWORD"
       fi
 
       CA_CERT_CONTENT=""
@@ -561,8 +561,8 @@ mkdir -p /tmp/1/etc/dropbear || true
 /tmp/1/bin/dropbearkey -t rsa -s 2048 -f /tmp/1/etc/dropbear/dropbear_rsa_host_key
 /tmp/1/bin/dropbearkey -t ecdsa -s 521 -f /tmp/1/etc/dropbear/dropbear_ecdsa_host_key
 
-cat /tmp/1/etc/shadow | grep -v root > /tmp/1/etc/shadow.tmp
-mv /tmp/1/etc/shadow.tmp /tmp/1/etc/shadow
+grep -v '^root:' /tmp/1/etc/shadow > /tmp/1/etc/shadow.tmp || true
+mv /tmp/1/etc/shadow.tmp /tmp/1/etc/shadow || true
 ROOTME_EOF
 
         cat >> "$ROOTME_SCRIPT" << ROOTME_EOF
