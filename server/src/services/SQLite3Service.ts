@@ -14,6 +14,7 @@ import type {
 } from '../lib/types';
 import { environment } from '../config/environment';
 import { AbstractDeviceStateManager } from './AbstractDeviceStateManager';
+import path from 'path';
 
 export class SQLite3Service extends AbstractDeviceStateManager {
   private db: Database | null = null;
@@ -35,10 +36,14 @@ export class SQLite3Service extends AbstractDeviceStateManager {
 
     for (const stmt of schemaStatements) {
       await new Promise<void>((resolve, reject) => {
+
+        console.log('[SQLite3] Running schema statement:', stmt);
         db.run(stmt, (err) => {
           if (err) {
+            console.error('[SQLite3] Error creating schema:', err);
             reject(err);
           } else {
+            console.log('[SQLite3] Created schema');
             resolve();
           }
         });
@@ -62,16 +67,16 @@ export class SQLite3Service extends AbstractDeviceStateManager {
 
     this.initPromise = (async () => {
       try {
-        const SQLITE3_DB_PATH = environment.SQLITE3_DB_PATH!;
-        console.debug('Initializing SQLite3 db at ', SQLITE3_DB_PATH);
+        const SQLITE3_DB_PATH = path.resolve(environment.SQLITE3_DB_PATH!);
+        console.debug('[SQLite3] Initializing db at ', SQLITE3_DB_PATH);
         
         const db = await new Promise<Database>((resolve, reject) => {
           const db = new Database(SQLITE3_DB_PATH, (err) => {
             if (err) {
-                reject(err);
+              reject(err);
             }
-          });
-          resolve(db);
+            resolve(db);
+          });          
         });
 
         await this.createSchema(db);
@@ -81,7 +86,7 @@ export class SQLite3Service extends AbstractDeviceStateManager {
         return db;
       } catch (error) {
         console.error('[SQLite3] Failed to initialize database:', error);
-        return null;
+        process.exit(1);
       }
     })();
 
