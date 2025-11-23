@@ -151,13 +151,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return {};
     }
 
-    try {
-      const result = await db.query('device:getAllState' as any);
-      return result?.deviceState || {};
-    } catch (error) {
-      console.error('[SQLite3] Failed to get all state:', error);
-      return {};
-    }
+    console.warn('[SQLite3] getAllState is not implemented yet.');
+    return {};
   }
 
   /**
@@ -169,16 +164,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return null;
     }
 
-    try {
-      const result = await db.mutation('users:generateEntryKey' as any, {
-        serial,
-        ttlSeconds,
-      });
-      return result;
-    } catch (error) {
-      console.error(`[SQLite3] Failed to generate entry key for ${serial}:`, error);
-      return null;
-    }
+    console.warn('[SQLite3] generateEntryKey is not implemented yet.');
+    return null;
   }
 
   /**
@@ -190,13 +177,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return null;
     }
 
-    try {
-      const result = await db.query('users:getDeviceOwner' as any, { serial });
-      return result;
-    } catch (error) {
-      console.error(`[SQLite3] Failed to get device owner for ${serial}:`, error);
-      return null;
-    }
+    console.warn('[SQLite3] getDeviceOwner is not implemented yet.');
+    return null;
   }
 
   /**
@@ -208,11 +190,7 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return;
     }
 
-    try {
-      await db.mutation('users:updateUserAwayStatus' as any, { userId });
-    } catch (error) {
-      console.error(`[SQLite3] Failed to update away status for user ${userId}:`, error);
-    }
+    console.warn('[SQLite3] updateUserAwayStatus is not implemented yet.');
   }
 
   /**
@@ -224,11 +202,7 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return;
     }
 
-    try {
-      await db.mutation('users:syncUserWeatherFromDevice' as any, { userId });
-    } catch (error) {
-      console.error(`[SQLite3] Failed to sync weather for user ${userId}:`, error);
-    }
+    console.warn('[SQLite3] syncUserWeatherFromDevice is not implemented yet.');
   }
 
   /**
@@ -240,11 +214,7 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return;
     }
 
-    try {
-      await db.mutation('users:ensureDeviceAlertDialog' as any, { serial });
-    } catch (error) {
-      console.error(`[SQLite3] Failed to ensure alert dialog for ${serial}:`, error);
-    }
+    console.warn('[SQLite3] ensureDeviceAlertDialog is not implemented yet.');
   }
 
   /**
@@ -256,13 +226,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return null;
     }
 
-    try {
-      const result = await db.query('weather:getWeather' as any, { postalCode, country });
-      return result;
-    } catch (error) {
-      console.error(`[SQLite3] Failed to get weather for ${postalCode}, ${country}:`, error);
-      return null;
-    }
+    console.warn('[SQLite3] getWeather is not implemented yet.');
+    return null;
   }
 
   /**
@@ -279,16 +244,7 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return;
     }
 
-    try {
-      await db.mutation('weather:upsertWeather' as any, {
-        postalCode,
-        country,
-        fetchedAt,
-        data,
-      });
-    } catch (error) {
-      console.error(`[SQLite3] Failed to upsert weather for ${postalCode}, ${country}:`, error);
-    }
+    console.warn('[SQLite3] upsertWeather is not implemented yet.');
   }
 
   /**
@@ -303,19 +259,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
     if (!db) {
       return;
     }
-
-    try {
-      await db.mutation('users:updateWeatherForPostalCode' as any, {
-        postalCode,
-        country,
-        weatherData,
-      });
-    } catch (error) {
-      console.error(
-        `[SQLite3] Failed to update weather for postal code ${postalCode}, ${country}:`,
-        error
-      );
-    }
+    
+    console.warn('[SQLite3] updateWeatherForPostalCode is not implemented yet.');
   }
 
   /**
@@ -327,13 +272,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return null;
     }
 
-    try {
-      const result = await db.query('users:getUserById' as any, { userId });
-      return result?.weather || null;
-    } catch (error) {
-      console.error(`[SQLite3] Failed to get user weather for ${userId}:`, error);
-      return null;
-    }
+    console.warn('[SQLite3] getUserWeather is not implemented yet.');
+    return null;
   }
 
   /**
