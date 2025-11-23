@@ -133,34 +133,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return null;
     }
 
-    try {
-      const result = db.get(
-        `SELECT serial, object_key, object_revision, object_timestamp, value
-         FROM device
-         WHERE serial = ? AND object_key = ?;`,
-        [serial, objectKey]
-        , (err, row) => {
-          if (err) {
-            throw err;
-          }
-          if (row) {
-            console.log('Row fetched: ', row);
-            return {
-              object_key: row.object_key,
-              object_revision: row.object_revision,
-              object_timestamp: row.object_timestamp,
-              value: JSON.parse(row.value),
-            } as DeviceObject;
-          } else {
-            return null;
-          }
-        }
-      );
-      return result || null;
-    } catch (error) {
-      console.error(`[SQLite3] Failed to get state for ${serial}/${objectKey}:`, error);
-      return null;
-    }
+    console.warn('[SQLite3] getState is not implemented yet.');
+    return null;
   }
 
   /**
@@ -367,13 +341,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return [];
     }
 
-    try {
-      const integrations = await db.action('integrations_actions:getAllEnabledMqttIntegrationsSecure' as any, {});
-      return integrations || [];
-    } catch (error) {
-      console.error('[SQLite3] Failed to fetch enabled MQTT integrations:', error);
-      return [];
-    }
+    console.warn('[SQLite3] getAllEnabledMqttIntegrations is not implemented yet.');
+    return [];
   }
 
   /**
@@ -385,13 +354,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return null;
     }
 
-    try {
-      const result = await db.mutation('apiKeys:validateApiKey' as any, { key });
-      return result;
-    } catch (error) {
-      console.error('[SQLite3] Failed to validate API key:', error);
-      return null;
-    }
+    console.warn('[SQLite3] validateApiKey is not implemented yet.');
+    return null;
   }
 
   /**
@@ -408,18 +372,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return false;
     }
 
-    try {
-      const result = await db.query('apiKeys:checkApiKeyPermission' as any, {
-        userId,
-        serial,
-        requiredScopes,
-        permissions,
-      });
-      return result || false;
-    } catch (error) {
-      console.error('[SQLite3] Failed to check API key permission:', error);
-      return false;
-    }
+    console.warn('[SQLite3] checkApiKeyPermission is not implemented yet.');
+    return false;
   }
 
   /**
@@ -431,13 +385,8 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return [];
     }
 
-    try {
-      const devices = await db.query('users:listUserDevices' as any, { userId });
-      return devices || [];
-    } catch (error) {
-      console.error('[SQLite3] Failed to list user devices:', error);
-      return [];
-    }
+    console.warn('[SQLite3] listUserDevices is not implemented yet.');
+    return [];
   }
 
   /**
@@ -449,12 +398,7 @@ export class SQLite3Service extends AbstractDeviceStateManager {
       return [];
     }
 
-    try {
-      const shares = await db.query('shares:getSharedWithMe' as any, { userId });
-      return shares || [];
-    } catch (error) {
-      console.error('[SQLite3] Failed to get shared devices:', error);
-      return [];
-    }
+    console.warn('[SQLite3] getSharedWithMe is not implemented yet.');
+    return [];
   }
 }
