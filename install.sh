@@ -340,7 +340,7 @@ build_server_app() {
 }
 
 build_server_image() {
-  cd $ROOT_DIR
+  cd $ROOT_DIR/server
   echo "[→] Build nolongerevil docker image."
   docker build -t nolongerevil .
   echo ""
