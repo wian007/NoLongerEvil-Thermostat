@@ -2,13 +2,16 @@
  * Environment Configuration
  * Validates and exports all environment variables with sensible defaults
  */
-
+import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import type { EnvironmentConfig } from '../lib/types';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-dotenv.config();
+if (fs.existsSync(path.resolve(process.cwd(), '.env.local'))) {
+  console.log('[Config] Found .env.local file. Using this for environment setup.')
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+  dotenv.config();
+}
 
 /**
  * Parse integer from environment variable with fallback
@@ -47,9 +50,6 @@ function getEnvBoolean(key: string, defaultValue: boolean): boolean {
  * Validated environment configuration
  */
 export const environment: EnvironmentConfig = {
-  SQLITE3_ENABLED: getEnvBoolean('SQLITE_ENABLED', true),
-  SQLITE3_DB_PATH: getEnvString('SQLITE3_DB_PATH', './data/database.sqlite'),
-
   API_ORIGIN: getEnvString('API_ORIGIN', 'https://backdoor.nolongerevil.com'),
   PROXY_PORT: getEnvInt('PROXY_PORT', 443),
   CONTROL_PORT: getEnvInt('CONTROL_PORT', 8081),
@@ -63,6 +63,9 @@ export const environment: EnvironmentConfig = {
   MAX_SUBSCRIPTIONS_PER_DEVICE: getEnvInt('MAX_SUBSCRIPTIONS_PER_DEVICE', 100),
 
   DEBUG_LOGGING: getEnvBoolean('DEBUG_LOGGING', false),
+
+  SQLITE3_ENABLED: getEnvBoolean('SQLITE3_ENABLED', true),
+  SQLITE3_DB_PATH: getEnvString('SQLITE3_DB_PATH', './data/database.sqlite'),
 };
 
 /**

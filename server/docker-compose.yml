@@ -5,13 +5,17 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - 80:80
+      - 7001:80
       - 443:443
-      - 8081:8081
+    environment:
+      - API_ORIGIN=http://192.168.1.1
+      - PROXY_PORT=80
+      - SQLITE3_ENABLED=true
+      - SQLITE3_DB_PATH=./data/test.sqlite
+      - ENTRY_KEY_TTL_SECONDS=3600
+      - DEBUG_LOGGING=false
+      - CERT_DIR=
     volumes:
-      # Make sure to create your own env.local file. 
-      # You can use the .env.example as a starting point.
-      - ./env.local:/app/.env.local
       - nolongerevil-data:/app/data
 
 volumes:
