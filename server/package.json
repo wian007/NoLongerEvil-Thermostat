@@ -12,9 +12,10 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "convex": "^1.25.4",
     "dotenv": "^16.4.5",
-    "mqtt": "^5.14.1"
+    "mqtt": "^5.14.1",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@types/mqtt": "^0.0.34",

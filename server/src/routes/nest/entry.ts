@@ -11,9 +11,7 @@ import { environment } from '../../config/environment';
  * Returns service discovery URLs for device initialization
  */
 export function handleEntry(_req: IncomingMessage, res: ServerResponse): void {
-  const useHttps = environment.API_ORIGIN.toLowerCase().startsWith('https://');
-  const isStandardPort = (useHttps && environment.PROXY_PORT === 443) || (!useHttps && environment.PROXY_PORT === 80);
-  const baseUrl = isStandardPort ? environment.API_ORIGIN : `${environment.API_ORIGIN}:${environment.PROXY_PORT}`;
+  const baseUrl =  environment.API_ORIGIN
 
   const response = {
     czfe_url: `${baseUrl}/nest/transport`,

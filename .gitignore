@@ -22,6 +22,7 @@ out/
 
 # Environment variables
 .env
+env.local
 .env.local
 .env.production
 .env.development
@@ -116,9 +117,6 @@ coverage/
 # Next.js
 .next/
 next-env.d.ts
-
-# Convex
-**/convex/_generated/
 
 # Firmware build artifacts
 firmware/builder/firmware/

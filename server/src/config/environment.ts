@@ -2,13 +2,16 @@
  * Environment Configuration
  * Validates and exports all environment variables with sensible defaults
  */
-
+import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import type { EnvironmentConfig } from '../lib/types';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-dotenv.config();
+if (fs.existsSync(path.resolve(process.cwd(), '.env.local'))) {
+  console.log('[Config] Found .env.local file. Using this for environment setup.')
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+  dotenv.config();
+}
 
 /**
  * Parse integer from environment variable with fallback
@@ -47,9 +50,6 @@ function getEnvBoolean(key: string, defaultValue: boolean): boolean {
  * Validated environment configuration
  */
 export const environment: EnvironmentConfig = {
-  CONVEX_URL: getEnvNullable('CONVEX_URL') || getEnvNullable('NEXT_PUBLIC_CONVEX_URL'),
-  CONVEX_ADMIN_KEY: getEnvNullable('CONVEX_ADMIN_KEY'),
-
   API_ORIGIN: getEnvString('API_ORIGIN', 'https://backdoor.nolongerevil.com'),
   PROXY_PORT: getEnvInt('PROXY_PORT', 443),
   CONTROL_PORT: getEnvInt('CONTROL_PORT', 8081),
@@ -63,6 +63,9 @@ export const environment: EnvironmentConfig = {
   MAX_SUBSCRIPTIONS_PER_DEVICE: getEnvInt('MAX_SUBSCRIPTIONS_PER_DEVICE', 100),
 
   DEBUG_LOGGING: getEnvBoolean('DEBUG_LOGGING', false),
+
+  SQLITE3_ENABLED: getEnvBoolean('SQLITE3_ENABLED', true),
+  SQLITE3_DB_PATH: getEnvString('SQLITE3_DB_PATH', './data/database.sqlite'),
 };
 
 /**
@@ -72,12 +75,12 @@ export function validateEnvironment(): void {
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  if (!environment.CONVEX_URL) {
-    warnings.push('CONVEX_URL not configured - state will not persist');
-  }
-
-  if (!environment.CONVEX_ADMIN_KEY) {
-    warnings.push('CONVEX_ADMIN_KEY not configured - some operations may fail');
+  if (environment.SQLITE3_ENABLED){
+    console.log('[Config] SQLite3 storage enabled');
+    if (!environment.SQLITE3_DB_PATH) {
+     errors.push('SQLITE3_DB_PATH will use the default path. ./data/database.sqlite');
+     environment.SQLITE3_DB_PATH = './data/database.sqlite';
+    }
   }
 
   if (environment.PROXY_PORT < 1 || environment.PROXY_PORT > 65535) {
@@ -100,7 +103,10 @@ export function validateEnvironment(): void {
   console.log(`[Config] API Origin: ${environment.API_ORIGIN}`);
   console.log(`[Config] Proxy Port: ${environment.PROXY_PORT}`);
   console.log(`[Config] Control Port: ${environment.CONTROL_PORT}`);
-  console.log(`[Config] Convex: ${environment.CONVEX_URL ? 'Configured' : 'Not configured'}`);
+  console.log(`[Config] State manager: ${environment.SQLITE3_ENABLED ? 'SQLite3' : 'Default SQLite3'}`);
+  if (environment.SQLITE3_ENABLED) {
+    console.log(`[Config] SQLite3 DB Path: ${environment.SQLITE3_DB_PATH}`);
+  }
   console.log(`[Config] TLS Certificates: ${environment.CERT_DIR || 'Not configured (HTTP only)'}`);
   console.log(`[Config] Debug Logging: ${environment.DEBUG_LOGGING ? 'Enabled' : 'Disabled'}`);
 }

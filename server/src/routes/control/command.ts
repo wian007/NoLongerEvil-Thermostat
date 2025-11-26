@@ -38,7 +38,7 @@ export async function handleCommand(
 
   let currentObj = await deviceState.get(serial, objectKey);
   if (!currentObj) {
-    await deviceState.hydrateFromConvex(serial);
+    await deviceState.hydrateFromDeviceStatemanager(serial);
     currentObj = await deviceState.get(serial, objectKey);
 
     if (!currentObj) {

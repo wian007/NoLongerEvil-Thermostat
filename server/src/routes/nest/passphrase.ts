@@ -4,8 +4,8 @@
  */
 
 import { IncomingMessage, ServerResponse } from 'http';
-import { ConvexService } from '../../services/ConvexService';
 import { environment } from '../../config/environment';
+import { AbstractDeviceStateManager } from '@/services/AbstractDeviceStateManager';
 
 /**
  * Handle GET /nest/passphrase
@@ -15,26 +15,26 @@ export async function handlePassphrase(
   _req: IncomingMessage,
   res: ServerResponse,
   serial: string,
-  convex: ConvexService
+  deviceStateManager: AbstractDeviceStateManager
 ): Promise<void> {
   const ttl = environment.ENTRY_KEY_TTL_SECONDS;
 
-  const convexKey = await convex.generateEntryKey(serial, ttl);
+  const deviceStateManagerKey = await deviceStateManager.generateEntryKey(serial, ttl);
 
-  if (!convexKey) {
-    console.error(`[Passphrase] Failed to generate entry key for ${serial} - Convex unavailable`);
+  if (!deviceStateManagerKey) {
+    console.error(`[Passphrase] Failed to generate entry key for ${serial} - device state manager unavailable`);
     res.writeHead(503, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Entry key service unavailable' }));
     return;
   }
 
-  console.log(`[Passphrase] Generated entry key for ${serial}: ${convexKey.code})`);
+  console.log(`[Passphrase] Generated entry key for ${serial}: ${deviceStateManagerKey.code})`);
 
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(
     JSON.stringify({
-      value: convexKey.code,
-      expires: convexKey.expiresAt,
+      value: deviceStateManagerKey.code,
+      expires: deviceStateManagerKey.expiresAt,
     })
   );
 }

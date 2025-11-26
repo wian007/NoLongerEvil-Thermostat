@@ -33,7 +33,7 @@
         ],
         "summary": "Send a thermostat command",
         "operationId": "sendCommand",
-        "description": "Forwards a command to the specified thermostat and persists the state via Convex.",
+        "description": "Forwards a command to the specified thermostat and persists the state.",
         "requestBody": {
           "required": true,
           "content": {

@@ -2,19 +2,19 @@
  * WeatherService
  *
  * Handles weather data caching and proxying to weather.nest.com
- * Implements 10-minute cache in Convex to reduce external API calls
+ * Implements 10-minute cache in device state manager to reduce external API calls
  */
 
 import * as https from 'https';
-import type { WeatherData, ConvexWeatherCache } from '../lib/types';
-import { ConvexService } from './ConvexService';
+import type { WeatherData, StateWeatherCache } from '../lib/types';
 import { environment } from '../config/environment';
+import { AbstractDeviceStateManager } from './AbstractDeviceStateManager';
 
 export class WeatherService {
-  private convex: ConvexService;
+  private deviceStateManager: AbstractDeviceStateManager;
 
-  constructor(convex: ConvexService) {
-    this.convex = convex;
+  constructor(deviceStateManager: AbstractDeviceStateManager) {
+    this.deviceStateManager = deviceStateManager;
   }
 
   /**
@@ -44,7 +44,6 @@ export class WeatherService {
 
     if (!isIpQuery && postalCode && country) {
       await this.cacheWeather(postalCode, country, weatherData);
-      await this.propagateWeatherToUsers(postalCode, country, weatherData);
     }
 
     return weatherData;
@@ -75,13 +74,13 @@ export class WeatherService {
   }
 
   /**
-   * Get cached weather from Convex
+   * Get cached weather from device state manager
    */
   private async getCachedWeather(
     postalCode: string,
     country: string
-  ): Promise<ConvexWeatherCache | null> {
-    const cached = await this.convex.getWeather(postalCode, country);
+  ): Promise<StateWeatherCache | null> {
+    const cached = await this.deviceStateManager.getWeather(postalCode, country);
 
     if (!cached) {
       return null;
@@ -97,43 +96,14 @@ export class WeatherService {
   }
 
   /**
-   * Cache weather data in Convex
+   * Cache weather data in device state manager
    */
   private async cacheWeather(
     postalCode: string,
     country: string,
     data: WeatherData
   ): Promise<void> {
-    await this.convex.upsertWeather(postalCode, country, Date.now(), data);
-  }
-
-  /**
-   * Propagate weather data to all users with this postal code
-   * Extracts current and location data from weatherData
-   */
-  private async propagateWeatherToUsers(
-    postalCode: string,
-    country: string,
-    weatherData: WeatherData
-  ): Promise<void> {
-    try {
-      const locationKey = `${postalCode},${country}`;
-      const weatherInfo = weatherData[locationKey];
-
-      if (weatherInfo && weatherInfo.now) {
-        const weatherDataToSave: WeatherData = {
-          [locationKey]: {
-            now: weatherInfo.now,
-            forecast: weatherInfo.forecast
-          }
-        };
-
-        await this.convex.updateWeatherForPostalCode(postalCode, country, weatherDataToSave);
-        console.log(`[WeatherService] Propagated weather to users with postal code ${postalCode},${country}`);
-      }
-    } catch (err) {
-      console.error(`[WeatherService] Failed to propagate weather to users:`, err);
-    }
+    await this.deviceStateManager.upsertWeather(postalCode, country, Date.now(), data);
   }
 
   /**

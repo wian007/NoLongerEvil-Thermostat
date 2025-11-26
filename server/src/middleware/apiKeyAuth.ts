@@ -5,7 +5,7 @@
  */
 
 import { IncomingMessage, ServerResponse } from 'http';
-import { ConvexService } from '../services/ConvexService';
+import { AbstractDeviceStateManager } from '@/services/AbstractDeviceStateManager';
 
 export interface ApiKeyContext {
   userId: string;
@@ -45,7 +45,7 @@ function extractApiKey(req: IncomingMessage): string | null {
  */
 export async function validateApiKey(
   req: IncomingMessage,
-  convex: ConvexService
+  deviceStateManager: AbstractDeviceStateManager
 ): Promise<ApiKeyContext | null> {
   const key = extractApiKey(req);
 
@@ -53,8 +53,8 @@ export async function validateApiKey(
     return null;
   }
 
-  // Validate key via Convex
-  const context = await convex.validateApiKey(key);
+  // Validate key via device state manager
+  const context = await deviceStateManager.validateApiKey(key);
 
   if (!context) {
     return null;
@@ -69,9 +69,9 @@ export async function validateApiKey(
 export async function requireApiKey(
   req: IncomingMessage,
   res: ServerResponse,
-  convex: ConvexService
+  deviceStateManager: AbstractDeviceStateManager
 ): Promise<ApiKeyContext | null> {
-  const context = await validateApiKey(req, convex);
+  const context = await validateApiKey(req, deviceStateManager);
 
   if (!context) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -89,10 +89,10 @@ export async function checkDevicePermission(
   context: ApiKeyContext,
   serial: string,
   requiredScopes: string[],
-  convex: ConvexService
+  deviceStateManager: AbstractDeviceStateManager
 ): Promise<boolean> {
-  // Check permission via Convex (validates ownership + shares)
-  const hasPermission = await convex.checkApiKeyPermission(
+  // Check permission via device state manager (validates ownership + shares)
+  const hasPermission = await deviceStateManager.checkApiKeyPermission(
     context.userId,
     serial,
     requiredScopes,

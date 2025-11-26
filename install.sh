@@ -299,20 +299,21 @@ launch_installer() {
 
 setup_selfhost() {
   # Here is where we can put the different supported backend setup.
-  # Right now only Convex...
-  local which_backend="CONVEX"
+  # Right now only sqlite...
+  local which_backend="SQLITE"
 
   # Question here on which setup the user wants to use
-  # which_backend=$(prompt_value "Which backend do you want to use?" "CONVEX")
+  # which_backend=$(prompt_value "Which backend do you want to use?" "SQLITE")
   case $which_backend in
-    CONVEX)
-      setup_convex
+    SQLITE)
+      setup_sqlite
       ;;
     MQTT)
       setup_mqtt
       ;;
   esac
   
+  build_server_app
   build_server_image
 
   echo "Self-Host setup complete using $which_backend backend. You can "
@@ -322,49 +323,24 @@ setup_selfhost() {
   echo ""
 }
 
-setup_convex() {
-  local generated_admin_key=""
-
-  if [ -d $ROOT_DIR/convex ]; then
-    if prompt_yes_no "Convex data folder already exists. Do you want to recreate?" "n"; then
-      rm -fr $ROOT_DIR/convex
-      mkdir -p $ROOT_DIR/convex/data
-    fi
-  fi
-
-  echo "[→] Starting Convex Backend..."
-  docker compose up -d backend
-  echo "[→] Getting Convex Admin Key..."
-  generated_admin_key=$(docker compose exec backend ./generate_admin_key.sh)
-  echo ""
-  echo "[✓] Key = $generated_admin_key"
-  echo ""
-
-  echo "[→] Updating Server .env.local for Convex Initialization"
-  update_env_value "CONVEX_SELF_HOSTED_URL" "http://127.0.0.1:3210"
-  update_env_value "CONVEX_SELF_HOSTED_ADMIN_KEY" "$generated_admin_key"
-  cp $ENV_TEMPLATE $SERVER_DIR/.env.local
-
-  echo "[→] Initializing Server and Convex"
-  cd $SERVER_DIR
-  npm install
-  npx convex deploy
-  echo "[→] Stopping Convex Backend."
-  cd $ROOT_DIR
-  docker compose stop backend
-  
-  echo "[→] Update Server .env.local to use Convex Docker"
-  update_env_value "CONVEX_SELF_HOSTED_URL" "http://backend:3210"
-  update_env_value "CONVEX_URL" "http://backend:3210"
-  echo ""
+setup_sqlite() {
+  echo "Using default backend. (SQLite)"
 }
 
 setup_mqtt() {
   echo "Setup MQTT"
 }
 
+build_server_app() {
+  cd $ROOT_DIR/server
+  echo "[->] Build nolongerevil server."
+  npm install
+  npm run build
+  echo ""
+}
+
 build_server_image() {
-  cd $ROOT_DIR
+  cd $ROOT_DIR/server
   echo "[→] Build nolongerevil docker image."
   docker build -t nolongerevil .
   echo ""

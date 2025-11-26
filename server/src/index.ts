@@ -5,7 +5,6 @@ import * as path from 'path';
 import * as url from 'url';
 import { environment, validateEnvironment } from './config/environment';
 import { initializeFileLogging } from './lib/logger';
-import { ConvexService } from './services/ConvexService';
 import { DeviceStateService } from './services/DeviceStateService';
 import { SubscriptionManager } from './services/SubscriptionManager';
 import { WeatherService } from './services/WeatherService';
@@ -22,15 +21,16 @@ import { handleStatus, handleDevices, handleNotifyDevice } from './routes/contro
 import { normalizeUrl } from './middleware/urlNormalizer';
 import { logRequest, createResponseLogger } from './middleware/debugLogger';
 import { IntegrationManager } from './integrations/IntegrationManager';
-
+import { AbstractDeviceStateManager } from './services/AbstractDeviceStateManager';
+import { SQLite3Service } from './services/SQLite3Service';
 validateEnvironment();
 
 initializeFileLogging();
 
-const convexService = new ConvexService();
-const deviceStateService = new DeviceStateService(convexService);
+const deviceStateManager: AbstractDeviceStateManager = new SQLite3Service()
+const deviceStateService = new DeviceStateService(deviceStateManager);
 const subscriptionManager = new SubscriptionManager();
-const weatherService = new WeatherService(convexService);
+const weatherService = new WeatherService(deviceStateManager);
 const integrationManager = new IntegrationManager();
 
 /**
@@ -129,7 +129,7 @@ async function handleDeviceRequest(req: http.IncomingMessage, res: http.ServerRe
       if (environment.DEBUG_LOGGING) {
         logRequest(req);
       }
-      await handlePassphrase(req, res, serial, convexService);
+      await handlePassphrase(req, res, serial, deviceStateManager);
       return;
     }
 
@@ -137,7 +137,7 @@ async function handleDeviceRequest(req: http.IncomingMessage, res: http.ServerRe
       if (environment.DEBUG_LOGGING) {
         logRequest(req);
       }
-      await handleTransportGet(req, res, serial, deviceStateService, convexService);
+      await handleTransportGet(req, res, serial, deviceStateService, deviceStateManager);
       return;
     }
 
@@ -146,7 +146,7 @@ async function handleDeviceRequest(req: http.IncomingMessage, res: http.ServerRe
       if (environment.DEBUG_LOGGING) {
         logRequest(req, body);
       }
-      await handleTransportSubscribe(req, res, serial, body, deviceStateService, subscriptionManager, convexService);
+      await handleTransportSubscribe(req, res, serial, body, deviceStateService, subscriptionManager, deviceStateManager);
       return;
     }
 
@@ -155,7 +155,7 @@ async function handleDeviceRequest(req: http.IncomingMessage, res: http.ServerRe
       if (environment.DEBUG_LOGGING) {
         logRequest(req, body);
       }
-      await handlePut(req, res, serial, body, deviceStateService, subscriptionManager, convexService);
+      await handlePut(req, res, serial, body, deviceStateService, subscriptionManager, deviceStateManager);
       return;
     }
 
@@ -288,7 +288,7 @@ async function startServers(): Promise<void> {
   });
 
   console.log('[Integrations] Loading enabled integrations...');
-  await integrationManager.initialize(convexService, deviceStateService, subscriptionManager);
+  await integrationManager.initialize(deviceStateManager, deviceStateService, subscriptionManager);
 
   deviceStateService.setIntegrationManager(integrationManager);
 
